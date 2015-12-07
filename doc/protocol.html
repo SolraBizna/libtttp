@@ -1,0 +1,402 @@
+<html>
+<head>
+<title>TTTP Specification</title>
+<link rel="stylesheet" type="text/css" href="css.css">
+</head>
+<body>
+<h2>Important Note</h2>
+<p>Supporting Unicode is a complicated matter, warranting careful attention. Compromises must be made on both sides to support Unicode and TTTP in a performant fashion. The "Unicode mode" present in this specification is not binding and should be considered a request for comments rather than a hard specification.</p>
+<h2>Overview</h2>
+<p>TTTP (Tejat Tui Transmission Protocol) represents a message-based protocol for remote access to TUI-based applications. It is designed with games in mind.</p>
+<p>A byte is 8 bits long. Network byte order (big-endian) is used throughout.</p>
+<p>TTTP is designed to use the TCP protocol. The standard port is 7028.</p>
+<h2>Rationale</h2>
+<p>There exist many protocols for TUI-based applications, including various combinations of Telnet, SSH, and ANSI escape sequences. TTTP is not a general replacement for these.</p>
+<p>TTTP has the following advantages:</p>
+<ul>
+<li>Bandwidth usage for transmitting a complete frame scales roughly with the complexity of the "delta" from the previous frame.</li>
+<li>Reasonably strong authentication and encryption. (SSH is superior to TTTP in this respect.)</li>
+<li>Details such as character encoding and attributes are fully specified.</li>
+<li>Distinct frames.</li>
+<li>Detailed keyboard state replication.</li>
+</ul>
+<p>TTTP is intended for the full-screen TUI applications, especially NetHack-like or Dwarf Fortress-like video games. It is not intended for traditional command line applications.</p>
+<h2>Authentication</h2>
+<p>Authentication is performed with a specific case of SRP-Z. The description of the process give below was derived from <a href="http://srp.stanford.edu/design.html">Tom Wu's website about SRP-6a</a>, and <a href="http://crypto.stackexchange.com/questions/25272/is-this-variant-of-srp-for-peer-to-peer-authentication-practical">this StackExchange post about SRP-Z</a>.</p>
+<h3>Parameters</h3>
+<pre>H() = SHA-256
+g = 5
+N (3072 bits; all arithmetic is done modulo N) =
+  ff12 d2f1  d5a0 a11a  5fe3 06d5  14cc 80e0
+  f4bf 31d5  ea39 cfd1  9c74 a7a4  4b5f 974e
+  6496 3216  0861 84e3  070b 5541  4661 c54a
+  c825 f3f4  ed10 9388  ad3a 2f5e  2dd5 6a96
+  0c8c a0c4  22d6 f020  41e8 555c  c02b 539a
+  19b3 96a2  adfc dc4a  9c28 1878  4749 864a
+  393d 6fb4  57e7 c44d  665d 4a42  09db 57cf
+  b860 b628  2a0c e4fe  e09d e048  47db ff93
+  8f16 ab50  7f92 0872  bdbb 9b3d  de95 1684
+  15cc 38b4  e3aa 86e9  7daf c29a  6d4a 08eb
+  f01c e2d5  1aa1 0a21  f903 460f  93a3 3b36
+  58d8 f16c  bc5a 942e  6c31 d6b9  e6fa a124
+  2c02 28b8  7c44 a44f  bfce 750c  fab2 0434
+  6e48 1dd1  a03c 1f70  b1c8 2dd0  1898 6476
+  60ec 32ac  83c2 9c95  cb5c bc93  3160 a369
+  3589 aeaa  29db 0d27  851e 96d8  a61b 0a59
+  53b0 fc10  9998 7d5f  33d2 ba14  3d6f 1a1d
+  8bc3 6f6f  3650 8fd0  4531 f929  726d 59b8
+  e159 9f91  1b4b 0698  c91d a691  d096 09c3
+  2b16 eb3d  7d0a 983e  d771 09e7  8206 991b
+  34e5 7237  409d 1b37  823c a0cc  91eb 36c7
+  88f2 2527  823c e34a  4347 e189  e722 42b0
+  8f32 737b  592e 0b19  5158 d746  26c5 6b8d
+  3aaa 5ecd  c09c 6ff4  c7aa cd9e  d3b8 6023
+k = H(N, g) =
+  9934 06e3  1c1e 6fb6  6ac3 6849  4841 a67c
+  65cd 48fd  8676 7e56  9e91 8ba7  b900 ebde
+H(H(N) xor H(g)) =
+  44d3 4573  353b 7a26  02a9 4769  9973 85c1
+  aa84 400c  f59a 8d3b  9466 610f  2d3a d171
+</pre>
+<h3>Conventions</h3>
+<dl>
+  <dt><tt>^</tt></dt>
+  <dd>Exponentiation (modulo N, as with all other arithmetic)</dd>
+  <dt><tt>h = g^z</tt></dt>
+  <dd>The server's public key.</dd>
+  <dt><tt>I</tt></dt>
+  <dd>The username.</dd>
+  <dt><tt>K = H(S)</tt><dt>
+  <dd>The session key.</dd>
+  <dt><tt>S = g^((a+ux)(b+uz))</tt></dt>
+  <dd>The final quantity from which the session key is derived.</dd>
+  <dt><tt>s</tt></dt>
+  <dd>A user-specific password salt, used to make dictionary attacks more difficult</dd>
+  <dt><tt>u = H(A, B)</tt></dt>
+  <dd>Random scrambling parameter, derived indirectly from client and server's random secret values</dd>
+  <dt><tt>v = g^x</tt></dt>
+  <dd>The "password verifier" for a user; this is the closest a server comes to storing a user's password</dd>
+  <dt><tt>x = H(s, p)</tt></dt>
+  <dd>Acts as the client's private key.</dd>
+  <dt><tt>z</tt></dt>
+  <dd>The server's private key.</dd>
+</dl>
+<h3>Procedure</h3>
+<h4>Server initialization</h4>
+<p>The server generates a secret key <tt>z</tt>, such that <tt>0 &lt; z &lt; N</tt>. It stores this in a <strong>very secure place</strong>---for example, on a USB drive that is removed after startup, or in a password-encrypted file. It is vital that different instances of the same server software have different <tt>z</tt>&mdash;it MUST NOT be hardcoded! It is also vital that different sessions of "the same" server use the same <tt>z</tt>.</p>
+<p>A server may opt out of server authentication, in which case it must act as with <tt>z = 0</tt>. This is not recommended.</p>
+<p>The server also generates a "salt nonce", 256 bits of random data. This is used as part of the user authentication process. Its secrecy is not as crucial as the private key; knowledge of the "salt nonce" only allows an attacker to determine whether a given account exists.</p>
+<h4>User initialization (server-side)</h3>
+<p>Whenever a user (including the guest user) has a password assigned, the server generates 256 bits of pseudorandom salt <tt>s</tt>. This salt is always newly generated at password assignment time, even if the password hasn't actually changed.</p>
+<p>The server stores <tt>s</tt>, along with <tt>v = g^H(s, p)</tt>, and destroys any other knowledge it has of the client's password.</p>
+<h4>Handshake: Query</h4>
+<p>The client queries the server for its <tt>h</tt> value. The server may refuse to provide one, in which case the client cannot continue to authenticate (unless it has a public key on file for this server). The client keeps this <tt>h</tt> value on file; if a later connection to "the same" server provides a different <tt>h</tt>, the user should be alerted and then be take special action to continue the connection.</p>
+<p>As an optimization, if the client has an <tt>h</tt> on file for this server, it MAY bypass the query step, assume its <tt>h</tt> value is correct, and only query (and check) the current value on authentication failure. Authentication <em>will</em> fail if the client's <tt>h</tt> does not match the server's <tt>z</tt>, and attackers cannot exploit this optimization to gain information about the user's password <em>or</em> the server's private key.</p>
+<p>If the server opts out of server authentication, which is not recommended, the server will provide <tt>h = 1</tt>. In this case, the client should display a scary message on <strong>every connection</strong> indicating that the server may be untrustworthy, and not "file" the <tt>h</tt>.</p>
+<h4>Handshake: Client to Server</h4>
+<p>The client generates a one-time secret value <tt>a</tt>, such that <tt>0 &leq; a &lt; N</tt>, and calculates <tt>A = kh + g^a</tt>. If <tt>A = 0</tt>, the client keeps generating new <tt>a</tt> until it doesn't.</p>
+<p>The client sends <tt>A</tt> and <tt>I</tt> to the server. (If a server receives <tt>A = 0</tt> or <tt>A &geq; N</tt>, it should abort the connection.)</p>
+<h4>Handshake: Server to Client</h4>
+<p>The server generates an <tt>s</tt> value for the given username based on the hash of the "salt nonce" and the username. If the user exists on the server, this value of <tt>s</tt> is then discarded and replaced with the one from the database. (<strong>DO NOT</strong> optimize away the step involving the "salt nonce" or an attacker can use the difference in processing time to determine a user's existence!)</p>
+<p>The server generates a one-time secret value <tt>b</tt> such that <tt>0 &leq; b &lt; N</tt>, and calculates <tt>B = kv + g^b</tt>. If <tt>B = 0</tt>, or <Tt>H(A, B) = 0</tt>, or <tt>H(A, B) &geq; N</tt>, the server keeps generating new <tt>b</tt> until it doesn't.</p>
+<p>The server then sends <tt>B</tt> and <tt>s</tt> to the client. (If a client receives <tt>B = 0</tt> or <tt>B &geq; N</tt> or <tt>B</tt> such that <tt>H(A, B) = 0</tt> or <tt>H(A, B) &geq; N</tt>, it should abort the connection.)</p>
+<h4>Key derivation</h4>
+<p>Both sides calculate <tt>u = H(A,B)</tt>.</p>
+<p>The client calculates <tt>S = ((B-kv)h^u)^(a+ux)</tt>.</p>
+<p>The server calculates <tt>S = ((A-kh)v^u)^(b+uz)</tt>.</p>
+<p>Both sides calculate <tt>K = H(S)</tt>.</p>
+<h4>Proof: Client to Server</h4>
+<p>The client sends <tt>M = H(H(N) xor H(g), H(I), s, A, B, K)</tt>.</p>
+<p>If this does not match the server's calculation of same, <em>or this user did not exist</em>, the server indicates an authentication failure at this point, and closes the connection.</p>
+<p>If a client has optimized by assuming an on-file public key was correct for this server, it should assume that was the cause of the failure and repeat the authentication process without that optimization.</p>
+<h4>Proof: Server to Client</h4>
+<p>The server sends <tt>H(A, M, K)</tt>.</p>
+<p>If this does not match the client's calculation of same, the client aborts the connection, and informs the user that the server is behaving in a deceptive way.</p>
+<h3>Distribution of keys</h3>
+<p>When a key is about to be added to a key database, its "key fingerprint" should be presented. The "key fingerprint" consists of the first half and second half of the SHA-256 of the public key, XORed together, presented as 2-digit pairs of lowercase hexadecimal digits, separated by colons.</p>
+<p>Clients should be able to import public keys in Base64 form, and servers should be able to import and export both public and private keys in Base64 and raw binary forms. Since public and private keys are both 384 bytes long, at least 512 bytes of Base64 are required. When exporting keys, there should be 64 characters per line.</p>
+<pre>Example fingerprint:
+  f0:e4:c2:f7:6c:58:91:6e:c2:58:f2:46:85:1b:ea:09
+Example Base64 key: (unusable because it is &geq; N)
+  /xLS8dXjDLGDusgHbfJrrgV+3Y9IWfTpJVj7z7Zrt7CuYTaf1zH42+kIp7iYpW/g
+  rauxF2/N4aaB5Oq7fjrRbg3YUuRtobqA8fl1iZfKUxqp1K/Td9JI/hrKGkbjBVXe
+  onDfUx+6CMvj/aH26FmcsoM+4++yGeay9LZcdaMH03pA/C61wb9vLdmsuB0BgKxP
+  VM+dzc1KjZrqXV/wlHbRjLtBhAg7x36RQugRnn3wMzjdEofTADz3+/SEkzlm90kJ
+  nXjJiU9sXHTf23UswYsqNKyWa/2SYs5VgVaFXAwc9+fKLNJCDdIIKHfdQfWRgr2a
+  D6cf11mfwDb9vTfT/sU0cg/ZMPTsDT3VbMKa3hEtI5tlJBTPGaKgsssmm0g3jJez
+  oTje3KJl26tVHzRMXz/OZFrbuH9G3TRxLSj6OZBbFWun9nGP/ws0WHxX610Bep3g
+  16MdQcI6cx7eqFewl1E9BGQ1j7HlTWUvgk53ZX/JIwiBv3jGbrDHf1IBa0XiQ+PB</pre>
+<h2>Low-level Protocol</h2>
+<p>All communication takes places in messages.</p>
+<h3>Identifier</h3>
+<p>The first part of a message is a four-byte identifier giving the type of message. The first two bytes must be ASCII <i>letters</i> (0x41-0x5A), except that they also contain the following flag bits:</p>
+<ul>
+<li>Bit 8 of the first byte is set if the message IS accompanied by data.</li>
+<li>The first byte is uppercase (bit 5 clear) if the message type is specified in the official specification (i.e. this document), and should be lowercase if it is not, for example if the message is a third-party extension.</li>
+<li>Bit 8 of the second byte is reserved. It should never be set, and compliant programs will treat it as if it were always 0.</li>
+<li>The second byte is uppercase (bit 5 clear) if the message is critical to further communication; receival of an unknown critical message should result in connection termination.</li>
+</ul>
+<p>The combination of lowercase first byte / uppercase second byte is unlikely but not, theoretically, impossible.</p>
+<h3>Data</h3>
+<p>If bit 8 of the first byte of the message type identifier is set, the number of bytes of data accompanying the message are encoded as follows:</p>
+<pre>
+0-127 bytes: 0x00-0x7F
+128-16383 bytes: 0x80-0xFF 0x00-0x7F
+16384-2097151 bytes: 0x80-0xFF 0x80-0xFF 0x00-0x7F
+</pre>
+<p>It is an error for the first length byte to be exactly 0x80; such a length could have been encoded in fewer bytes.</p>
+<p>If bit 8 of the first or second length byte is set, this indicates the presence of a second or third byte. This method can encode a quantity up to 21 bits. Transmission of messages containing more than the ~2MB of data this can encode is best left to other protocols.</p>
+<p>(The encoding can easily be extended to 28 or more bits if needed, but I consider this... unlikely to happen.)</p>
+<p>The length is followed by exactly the number of bytes of data it specifies.</p>
+<p>The connection should be terminated if a data length of 0 bytes is explicitly given, or if the high bit of a third length byte is set. It should also be terminated if too few bytes of data are given for the message to make sense. If more data is received than is understood for a given message type, the extra data must be ignored. (This gives room for future extensions.)</p>
+<h2>Handshake</h2>
+<h3>Initiation</h3>
+<p>The client may only send one of the following message types:</p>
+<ul>
+<li><tt>'QUER' {}</tt><br>
+This message may optionally be sent once for a given connection, as long as it is the first message sent. It MUST result in an error if it is sent after ANY other message, including another <tt>'QUER'</tt>!</li>
+<li><tt>'FLAG' { uint32_t flags; }</tt><br>
+The client will send this message to indicate which <a href="#FeatureFlag">feature flags</a> it wishes to use.<br>
+This message MUST be sent at least once before any message other than <tt>'FLAG'</tt> or <tt>'QUER'</tt> are sent. It MUST result in an error if it is sent after a message other than <tt>'FLAG'</tt> or <tt>'QUER'</tt>.</li>
+<li><tt>'AUTH' { uint8_t A[384]; uint8_t length; uint8_t username[length]; }</tt><br>
+(At least one 'FLAG' message must be sent before this message. The client indicates acceptance of the 'FLAG' provided by the server by sending this message.)<br>
+The client wishes to authenticate. A zero-length username is a valid, unique username, intended for "guest" access. A username may only contain printable ASCII characters (0x20&ndash;0x7E). Some servers may place additional restrictions on usernames.<br>
+The server will silently close the connection if A >= N or A == 0, so the client must never send such values for A.<br>
+The length of the username field is given explicitly, rather than being derived from the length of the message, to allow for future extensions to the handshake. The length byte is always given, even when it is zero, for the same reason.</li>
+<li><tt>'NAUT' {}</tt><br>
+(At least one 'FLAG' message must be sent before this message. The client indicates acceptance of the 'FLAG' provided by the server by sending this message.)<br>
+The client does not wish to authenticate. (If the server accepts an un-authenticated connection, encryption is disabled, regardless of the <tt>'FLAG'</tt> values.)</li>
+</ul>
+<p>The client may also send non-critical messages during this stage. A strictly compliant server will ignore any unknown non-critical messages during this stage.</p>
+<p>The server will reply with:</p>
+<ul>
+<li><tt>'QUER' {}</tt><br>
+In response to a <tt>'QUER'</tt> message. The server expressly refuses to give its public key. This forces the user to install the server's public key manually before connection is possible.<br>
+This behavior should be controlled on a per-server basis by a configuration option, so that paranoid admins can enable it. Doing so, and warning users about it, mildly strengthens this particular server against man-in-the-middle attacks.</li>
+<li><tt>'QUER' { uint8_t h[384]; uint8_t length; uint8_t servername[length]; }</tt><br>
+In response to a <tt>'QUER'</tt> message. The server gives its public key in <tt>h</tt>, and an optional human-readable server name (in UTF-8) in <tt>servername</tt>.<br>
+The length of the servername field is given explicitly, rather than being derived from the length of the message, to allow for future extensions to the query response. The length byte is always given, even when it is zero, for the same reason.</li>
+<li><tt>'FLAG' { uint32_t flags; }</tt><br>
+In response to a <tt>'FLAG'</tt> message. The server will reply with all the feature flags that are currently enabled. This may include feature flags that were not explicitly requested in the last <tt>'FLAG'</tt> message, but <i>only if those flags are required for the connection to continue</i>&mdash;such as mandatory encryption.<br>
+The server MUST only send a 'FLAG' message in response to a client's 'FLAG' message.</li>
+<li><tt>'NAUT' {}</tt><br>
+In response to a <tt>'NAUT'</tt> message, indicates that the server requires authentication.<br>
+In response to an <tt>'AUTH'</tt> message with a blank username, indicates that the server has no "guest" account or does not support authentication.<br>
+In response to an <tt>'AUTH'</tt> message with a non-blank username, indicates that the server does not support username-based authentication. (<b>NOT</b> sent in response to a non-existent username! The authentication proceeds normally if that is the case, with the server performing all calculations it would normally perform, except that it will unconditionally reject the authentication attempt.)<br>
+The server will close the connection after sending this message.</li>
+<li><tt>'AUTH' {}</tt><br>
+In response to an <tt>'NAUT'</tt> message, indicates that the un-authenticated connection is accepted. This marks the completion of the handshake. (If the server accepts an un-authenticated connection, encryption is disabled.)</li>
+<li><tt>'AUTH' { uint8_t salt[32]; uint8_t B[384]; }</tt><br>
+In response to an <tt>'AUTH'</tt> message, this is the next stage of authentication. This message is sent even if the username was unknown.<br>
+If this message is sent, the connection advances to the next handshake stage.<br>
+The client will drop the connection and warn the user of foul play if B == 0 or B >= N or H(A,B) == 0 or H(A,B) >= N, so the server must never send such values for B.</li>
+</ul>
+<h3>Completion</h3>
+<p>The client may only send the following message type:</p>
+<ul>
+<li><tt>'AUTH' { uint8_t M[32]; }</tt><br>
+The crucial message of the handshake process, whereby the client proves (or disproves) its correct knowledge of the password.<br>
+Note to client authors: This specification places no limitations whatsoever on what constitutes a password, but by convention, even on servers and clients that only support some 8-bit encoding, "textual" passwords are in UTF-8. To be compatible with all servers, you should provide <em>some</em> way for users to specify the following types of password:<ul>
+<li>Empty password</li>
+<li>Printable ASCII password</li>
+<li>UTF-8 text password</li>
+<li>Complete contents of a chosen binary file, which fits comfortably in RAM</li>
+</ul>
+The vast majority of users will either use an empty password or a printable ASCII password.<br>
+You should securely erase the password from memory as soon as possible after calculating <tt>M</tt>.</li>
+</ul>
+<p>The server will reply with one of:</p>
+<ul>
+<li><tt>'AUTH' { uint8_t H[32]; }</tt><br>
+The server provides its half of the proof of correct knowledge of the password. The client should drop the connection and warn the user of foul play if the proof does not match (which means the server's private key is wrong <em>or</em> the server is attacking the authentication system deliberately). This marks the completion of the handshake.</li>
+<li><tt>'NAUT' {}</tt><br>
+Indicates that the server rejects the client's proof. This means either the password was incorrect, there is no such user, or there is a bug in the client or server.<br>
+The server will close the connection after sending this message.</li>
+</ul>
+<h2>Main Session</h2>
+<h3>Client to Server</h3>
+<ul>
+<li><tt>'Scrn' { uint16_t preferred_width, preferred_height, maximum_width, maximum_height; }</tt><br>
+Sent to indicate user-preferred values for the screen size, and hard limits for same. If either dimension of a pair is 0, the pair is considered "unspecified" (just as before any <tt>'Scrn'</tt> message is sent). A <tt>'Scrn'</tt> message overrides any <tt>'Scrn'</tt> messages that came before it.<br>
+Conforming servers may choose to reject a connection with a <tt>maximum_width</tt> below 80 or a <tt>maximum_height</tt> below 24, but all servers must fully support clients with maximums as small as 80x24.<br>
+It is advisable to send a <tt>'Scrn'</tt> message before the first <tt>'ONES'</tt> message, so the server may accomodate the user's choices and/or limitations starting with the first frame. A server may ignore <tt>'Scrn'</tt> messages after the first <tt>'ONES'</tt> message, or it may interpret them as a resize request.</li>
+<li><tt>'Queu' { uint8_t queue_depth; }</tt><br>
+Indicates the number of frames that the client wishes to maintain "in flight". Common queue depths are 2 (for a LAN), 5 (for Internet connections), and 10 (for very high-latency connections). 0 allows the server to manage the queue depth. A typical method of doing so is to simply treat 0 as 5, but the server might take a more dynamic strategy.<br>
+The server is free to silently cap this at a maximum, or even disregard it entirely and buffer as many (or as few) frames as it wishes.</li>
+<li><tt>'ONES' {}</tt><br>
+Indicates that a <tt>'FRAM'</tt> message has been received.<br>
+The server will try to ignore any extraneous <tt>'ONES'</tt>, but sending more than necessary will inhibit the server from properly managing its frame queue, reducing performance.</li>
+<li><tt>'Kp__' / 'Kr__' {}</tt><br>
+Sent to indicate keyboard state. A <tt>'Kp__'</tt> message indicates that a key was <em>pressed</em> (or repeated), a <tt>'Kr__'</tt> message indicates that a key was <em>released</em>.<br>
+If you are implementing something like a text field, <b>please</b> do not try to input text using <tt>'Kp__'</tt>/<tt>'Kr__'</tt>! <b>Please</b>, for the love of non-English users, use the <tt>'Text'</tt> event! Only <tt>'Text'</tt> events should insert text! (Keys that do not insert text, such as delete and arrow keys, should be handled through <tt>'Kp__'</tt>/<tt>'Kr__'</tt>, however.)<br>
+The <tt>__</tt> are two bytes encoding a 16-bit quantity. This quantity is the scancode for the key.<br>
+If the scancode is less than 128, the key had a (layout-dependent) sensible mapping to an ASCII character that <i>identifies the key</i>. (e.g. 0x41 for the 'A' key in the current layout)<br>
+All printable ASCII characters (except lowercase letters) are valid scancodes, as are the control characters Backspace (0x08), Tab (0x09), Line Feed (0x0A, sent when either the Return or Enter key is pressed), Escape (0x1B), and [Forward] Delete (0x7F). Other codes below 0x80 are invalid and should be ignored.<br>
+Otherwise, the scancode is a USB HID Keyboard/Keypad page usage ID, plus 128, indicating the (layout-independent) physical key. (e.g. 0xBC corresponds to usage ID 0x3C, which corresponds to the F3 key)<br>
+See <a href="scancodes.html">here</a> for a table of all possible scancodes.<br>
+The scancode should normally not be affected by the currently-pressed modifier keys. The only allowed exception is the Num Lock key and the numeric keypad; supporting raw keypad scancodes consistently across platforms is simply impossible.<br>
+When a connection closes, the server should act as though all currently-pressed keys were released with a <tt>'Kr__'</tt> message before the end. Servers should also be tolerant of spurious <tt>'Kr__'</tt> messages.</li>
+<li><tt>'Text' { uint8_t text[]; }</tt><br>
+Text input from the user. Whether this is sent before or after the keypresses that caused it is client-dependent. This text should not contain any non-printing characters&mdash;if a user typed, for instance, a newline, send the corresponding scancode instead.<br>
+The text is not NUL-terminated. An empty <tt>'Text'</tt> message, or a <tt>'Text'</tt> message containing a NUL, is an error.</li>
+<li><tt>'Mous' { int16_t x, y; }</tt><br>
+Sent by the client to indicate movement of the mouse. The position is in character cells, and may fall outside the "screen."<br>
+The client is responsible for displaying a mouse cursor. The server does not need to incorporate the mouse position into its frames.<br>
+The server should fully support clients that do not have mouse support. Keyboard alternatives for all UI actions must be provided.</li>
+<li><tt>'Mp__' / 'Mr__' {}</tt><br>
+Sent by the client to indicate that a mouse button was pressed, or released. The server may ignore such messages before at least one <tt>'Mous'</tt> message has been received.<br>
+Some users will have only two mouse buttons (left and right). On platforms where there is only a single mouse button, the client MUST provide a way for the user to emulate a right-click IF it provides mouse support at all.<br>
+The __ is a 16-bit button index. Known indices:<ol start="0">
+<li>Left mouse button</li>
+<li>Middle mouse button</li>
+<li>Right mouse button</li>
+</ol>
+Higher indices correspond to extended mouse buttons.<br>
+The server should fully support clients that do not have mouse support. Keyboard alternatives for all UI actions must be provided.</li>
+<li><tt>'Sc<i>xy</i>' {}</tt><br>
+Sent by the client to indicate that the mouse wheel was scrolled, or the device-specific equivalent. `x` and `y` are signed bytes. Positive `x` is right, positive `y` is up / away. One unit corresponds to a single detente on a mousewheel.<br>
+The server should fully support clients that do not have mouse support. Keyboard alternatives for all UI actions must be provided.</li>
+</ul>
+<h3>Server to Client</h3>
+<ul>
+<li><tt>'PLTT' { uint8_t colors[]; }</tt><br>
+Specifies the entire current color palette of the server. There must be between 2 and 16 colors (or no data), each of which is made up of an 8-bit red, green, and blue value in the sRGB colorspace.<br>
+Changing the palette does NOT destroy the frame. Existing color <i>indices</i> and data are preserved. Reinterpretation may take place immediately, or may be deferred until the next <tt>'FRAM'</tt>.<br>
+If no data is given, the default palette is to be used.<br>
+If there are at least one but fewer than 16 colors specified, the missing colors are repeats of the first color. If the number of bytes of data is not a multiple of 3, the "remainder" bytes are ignored.<br>
+It is valid, but silly, to specify only one color.<br>
+As with other messages, extra data is ignored. In this case, extra data would be any data after enough to specify 16 colors.<br>
+When a connection is first made, this is the default palette:<table>
+<thead>
+<tr><th><abbr title="Index">Id</abbr></th><th>Color</th><th><abbr title="Index">Id</abbr></th><th>Color</th><th><abbr title="Index">Id</abbr></th><th>Color</th><th><abbr title="Index">Id</abbr></th><th>Color</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td style="color:#000000; background-color:#ffffff">#000000</td>
+<td>1</td><td style="color:#800000; background-color:#ffffff">#800000</td>
+<td>2</td><td style="color:#008000; background-color:#ffffff">#008000</td>
+<td>3</td><td style="color:#808000; background-color:#ffffff">#808000</td></tr>
+<tr><td>4</td><td style="color:#000080; background-color:#ffffff">#000080</td>
+<td>5</td><td style="color:#800080; background-color:#ffffff">#800080</td>
+<td>6</td><td style="color:#008080; background-color:#ffffff">#008080</td>
+<td>7</td><td style="color:#808080; background-color:#ffffff">#808080</td></tr>
+<tr><td>8</td><td style="color:#606060; background-color:#ffffff">#606060</td>
+<td>9</td><td style="color:#FF0000; background-color:#000000">#FF0000</td>
+<td>10</td><td style="color:#00FF00; background-color:#000000">#00FF00</td>
+<td>11</td><td style="color:#FFFF00; background-color:#000000">#FFFF00</td></tr>
+<tr><td>12</td><td style="color:#0000FF; background-color:#000000">#0000FF</td>
+<td>13</td><td style="color:#FF00FF; background-color:#000000">#FF00FF</td>
+<td>14</td><td style="color:#00FFFF; background-color:#000000">#00FFFF</td>
+<td>15</td><td style="color:#FFFFFF; background-color:#000000">#FFFFFF</td></tr>
+</tbody>
+</table></li>
+<li><tt>'FRAM' { uint16_t width, height; uint8_t data[]; }</tt><br>
+If this is the first <tt>'FRAM'</tt> message or the previous <tt>'FRAM'</tt> message had a different width or height, this contains the frame data directly; otherwise, this contains the "delta" of each byte from the previous byte. Either way, the data is compressed with deflate as implemented by zlib and specified in RFC 1951, and the uncompressed size can be calculated from width and height. It is an error to provide more than this amount of data.<br>
+The compressed 'FRAM' packets received over the lifetime of a single connection make up a single deflate bitstream.<br>
+The client must send a <tt>'ONES'</tt> message whenever a <tt>'FRAM'</tt> message is received.<br>
+It is an error to send either a width or a height of 0.<br>
+The "delta" function is defined like the following:<pre>
+delta(previous, next)
+where next == previous: 0
+where next == 0: previous
+otherwise: next
+
+inverse_delta(previous, delta)
+where delta == 0: previous
+where delta == previous: 0
+otherwise: delta
+</pre></li>
+<li><tt>'DFRM' {} </tt><br>
+The client must treat the next <tt>'FRAM'</tt> message as "fresh", with no XORing of previous data. This does NOT break continuity of the deflate stream!<br>
+A <tt>'ONES'</tt> message MUST NOT be sent in response to this message, and it MUST NOT trigger an actual screen update. If a blank screen really is desired on the cheap, a blank <tt>'FRAM'</tt> message will follow the <tt>'DFRM'</tt> message.</li>
+<li><tt>'RSET' {} </tt><br>
+The client must reset to the state it was in immediately post handshake. That includes discarding any framebuffer data, resetting its decompression state, forgetting about any past <tt>'Kyrp'</tt> message, resetting the 8-bit encoding to CP437 (if applicable), re-sending <tt>'Queu'</tt>/<tt>'Scrn'</tt>, and resetting the palette to the default.<br>
+The client MUST send a 'Rack' message when it receives an 'RSET' message, but the server is not required to make use of this.<br>
+This is useful when implementing a proxy.</li>
+</li>
+<li><tt>'KICK' {}</tt><br>
+<tt>'KICK' { uint8_t text[]; }</tt><br>
+The connection is being terminated. This optionally gives a human-readable reason (in UTF-8). Clients may drop any text after the first NUL byte, or after the first 256 bytes.</li>
+<li><tt>'Kyrp' { uint32_t delay, interval; }</tt><br>
+The server wishes a keypress to repeat after a certain <tt>delay</tt>, repeating every <tt>interval</tt> after that. Units are milliseconds. If either <tt>delay</tt> or <tt>interval</tt> are zero, key repeat should be disabled. If either <tt>delay</tt> or <tt>interval</tt> are all ones (0xFFFFFFFF), whatever behavior is default should be used.<br>
+This is only a hint to the client and may be partly or completely ignored.</li>
+<li><tt>'Text' { uint8_t text[]; }</tt><br>
+A human-readable message for the user. This message should ordinarily not be sent&mdash;clients are not required to go out of their way to make these messages visible to the user, and if they do, they may do it in something like a modal message box. The text may not contain NULs and must not be zero bytes.</li>
+<li><tt>'CDPT' { uint32_t code_points[256]; }</tt><br>
+This message is only valid in 8-bit mode and should be ignored if received in Unicode mode. It contains a list of Unicode and CP437 code points that each 8-bit code used by the server maps to.<br>
+The upper 8 bits of each element of the <tt>code_points</tt> array give a CP437 code point. If the character cannot be mapped to CP437, NUL should be given. A client is required to support all of CP437, so consider the value here to be a "bare minimum fallback".<br>
+The lower 21 bits of each element give a Unicode code point. A character that cannot be mapped to Unicode should be replaced by U+FFFD (<tt>'&#65533;'</tt>).<br>
+The middle 3 bits are reserved and should always be 0.<br>
+Which set of code points is actually used will depend on which encoding the client uses internally. Applications that depend on Unicode support via 8-bit mode should prompt the user to confirm that all relevant characters are being displayed.<br>
+A Unicode-supporting client will use the Unicode code point if it supports it. If it doesn't (or the Unicode code point was U+FFFD), but the CP437 code point is non-zero, it will use that as a fallback. Otherwise, a special glyph (possibly just a '?') will be used.<br>
+When translating text from an internal encoding <i>to</i> the 8-bit format, when a character with no possible encoding is encountered, it should be entirely skipped.<br>
+When this message is received, previous frame data should be destroyed as if a 'DFRM' message was received.</li>
+</ul>
+<h2><a name="FrameLayout"></a>Frame Layout</h2>
+<h3>8-bit mode</h3>
+<p>A TTTP frame is stored in a planar fashion. The layout is row-major, left-to-right, top-to-bottom. First comes one byte per character cell of color data, where the high 4 bits are the foreground color index and the low 4 are the background color index. After the color data for all the cells comes one byte character cell of character data.</p>
+<p>Unless the encoding has been altered by a <tt>'CDPT'</tt> message, the character encoding is CP437.</p>
+<h3>Unicode mode</h3>
+<p>Unicode TTTP frames are stored tightly packed. As above, the layout is row-major. Each character cell is a 32-bit quantity. The upper 4 bits are the foreground color and the next 4 bits are the background color. The next 3 bits are reserved and should always be 0. This leaves 21 bits to encode a Unicode code point.</p>
+<p>Earlier versions of the protocol had a mixed 16-bit Unicode mode that did not support characters outside the BMP. This mode has been removed. A program supporting Unicode should endeavor to support it as completely as possible.</p>
+<p>The current protocol has a major problem, in that it is only capable of displaying glyphs that correspond to a single Unicode code point. I'm not aware of any way of solving this problem, while keeping the "character cell grid" concept. It also cannot adequately handle "full width" characters (such as CJK characters), or cursive scripts (such as Arabic).</p>
+<h2><a name="FeatureFlag"></a>Feature Flags</h2>
+<p>There are a number of features which alter the specification of the protocol. These are enabled during the handshake process, and currently all have no effect until after the handshake is complete.</p>
+<p>All feature flags start out disabled. All servers must be able to operate in this state&mdash;at least well enough to inform clients that certain features (e.g. encryption) are required.</p>
+<p>All servers must ignore feature flags they do not understand.</p>
+<ul>
+<li><tt>0x00000001</tt>: Encryption<br>
+With this feature enabled, the connection is encrypted in both directions.<br>
+When encryption is enabled, all traffic after the handshake is encrypted using Twofish-256 in OFB mode.<br>
+Before any "real" data is encrypted, all bytes of the negotiated session key are bitwise XORed together and a quantity in the range [0,15] derived from the result. For client-to-server communication, this is the low-order four bits; for server-to-client communication, the high-order four bits. This quantity of 0xCC bytes are encrypted as if to transmit, but not actually transmitted. This increases resistance to bit-twiddling attacks. (See <a href="#Attacks">Attacks</a>)<br>
+A 16-byte nonce is initialized with <tt>0x243f6a8885a308d313198a2e03707344</tt>* for client-to-server communication, and its bitwise complement for server-to-client communication.<br>
+This nonce is encrypted with the negotiated session key by 256-bit Twofish to create a block of "keystream" data. Each of the next 16 bytes sent is bitwise XORed against the corresponding byte of the keystream.<br>
+Once 16 bytes have been encrypted and sent in this manner, the corresponding cipher bytes are used as the next 16-byte nonce.<br>
+* These digits come from the hexadecimal expansion of pi.</li>
+<li><tt>0x00000002</tt>: Unicode mode<br>
+In the default state, TTTP encodes all text as CP437 (or an arbitrary 256-character subset of Unicode). With Unicode mode enabled, all text is transmitted as UTF-8 and the frame layout is quite different. (See <a href="#FrameLayout">Frame Layout</a>.)</li>
+</ul>
+<p>Third-party developers who wish to add feature flags to their extended versions of the protocol should contact me; I will ensure that collisions are avoided, and (if relevant) document the third-party feature flags in the spec.</p>
+<h2>Attacks</h2>
+<p>Disclaimer: I am not a cryptologist. TTTP has not been evaluated by a cryptologist, nor has anything I say below.</p>
+<p>Feature flag choices and the username to authenticate with are never encrypted. An eavesdropper may be able to exploit this information.</p>
+<p>TTTP offers encryption and authentication. When authentication and encryption are used, and all procedures are followed, the only known attack against TTTP is a very limited <a href="#BitTwiddling">bit twiddling</a> attack.</p>
+<h3>Impersonation</h3>
+<ul>
+  <li>If a server's private key is compromised, but not its password database, the server can be <em>partly</em> impersonated by an attacker.</li>
+  <ul>
+    <li>If the guest password is not blank, and is not known to the attacker...</li>
+    <ul>
+      <li>Guests that enter a password will see an authentication failure, but no indication that it was the server's fault.</li>
+      <li>Guests that enter a blank password will be fooled!</li>
+    </ul>
+    <li>If a user's password is not known to the attacker...</li>
+    <ul>
+      <li>Users will see an authentication failure, but no indication that it was the server's fault.</li>
+    </ul>
+  </ul>
+  <li>If a server's password database is compromised, but its private key remains secure, the server can be <em>partly</em> impersonated by an attacker.</li>
+  <ul>
+    <li>Users and guests that have previously recorded the right public key will see a scary warning message.</li>
+    <li>The attacker will be able to launch a dictionary attack against the stored passwords.</li>
+  </ul>
+  <li>If a server's password database <em>and</em> private key are compromised, the server can be <em>fully</em> impersonated by the attacker.</li>
+  <ul>
+    <li>If a user authenticates with an impersonating server...</li>
+    <ul>
+      <li>...the attacker will <em>not</em> be able to use the TTTP handshake <em>itself</em> to gain knowledge of the user's password.</li>
+      <li>...the attacker <em>may</em> be able to socially engineer the user into revealing their password <em>after</em> the handshake.</li>
+    </ul>
+    <li>The attacker will be able to launch a dictionary attack against the stored passwords.</li>
+  </ul>
+</ul>
+<p>Upshot: <strong>KEEP THE PRIVATE KEY SAFE!</strong> The damage that is done by a leaked private key is <strong>FAR</strong> greater than the (already considerable) damage done by a leaked password database!</p>
+<h3>Bit Twiddling</h3>
+<p>The basic theory is that an attacker knows the user is going to press one key, and wishes the user to press another key instead. A side effect of using OFB mode is that the attacker can flip the corresponding bits in the ciphertext (without decrypting it) and alter the plaintext. This is not considered a workable attack for the following reasons:</p>
+<ul>
+<li>An attacker would need to know which encrypted bytes belonged to the targeted input messages, in a sea of other messages including a constant stream of <tt>'ONES'</tt> messages. This requires knowing the precise timing of the targeted keypress.</li>
+<li>The use of OFB means that a corrupted (or tampered) bit will corrupt all blocks after the block in which it occurred. This means that any tampering will quickly destabilize the connection, making it difficult to perform such tampering undetected. This also means that even an <em>extremely</em> fortunate attacker could compromise, at most, four consecutive keypresses or sixteen bytes of <tt>'Text'</tt>, before the <em>violent termination of the session</em>.</li>
+<li>The random displacement at the beginning of the encrypted stream prevents an attacker from knowing where block boundaries occur. This means that even an extremely fortunate attacker does not know for sure how many bytes they can compromise before the <em>violent termination of the session</em>.</li>
+</ul>
+<p>A more obvious mode such as ECB or CBC mode was not used because of the requirement to pad to block boundaries, which would increase the bandwidth used by the protocol and otherwise complicate communications, while only protecting against a single attack that requires a large amount of supplementary knowledge (bordering on physical access) to mount.</p>
+</body>
+</html>

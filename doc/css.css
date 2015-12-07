@@ -1,0 +1,12 @@
+table,td,th { border: 1px solid black; font-size: 90%; }
+td,th { width: 8em; }
+td { text-align: center; }
+table { border-collapse: collapse; }
+td,th { padding: 0.25ex; }
+body { background-color: #ccc; color: #000; }
+a { color: #00f; }
+a:visited { color: #30f; }
+.evenrow,.evenodd { background-color: #dcb; }
+.evencol,.oddeven { background-color: #bcd; }
+.eveneven { background-color: #dbd; }
+tt,pre { border: 1px solid #aaa; background-color: #ddd; padding: 0.25ex; margin: 0.125ex; }
