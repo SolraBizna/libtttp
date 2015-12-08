@@ -286,6 +286,7 @@ static int base64_value(char c) {
   else if(c >= '0' && c <= '9') return c - '0' + 52;
   else if(c == '+') return 62;
   else if(c == '/') return 63;
+  else if(c == '=') return -2;
   else return -1;
 }
 
@@ -309,6 +310,7 @@ int tttp_key_from_base64(const char* str,
         base64_buf = base64_had = 0;
       }
     }
+    else if(v == -2) break;
   }
   if(outp == key + TTTP_KEY_LENGTH)
     return memcmp(key, SRP_N, SRP_N_BYTES) < 0;
