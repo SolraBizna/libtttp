@@ -114,7 +114,7 @@ H(H(N) xor H(g)) =
 <p>If this does not match the client's calculation of same, the client aborts the connection, and informs the user that the server is behaving in a deceptive way.</p>
 <h3>Distribution of keys</h3>
 <p>When a key is about to be added to a key database, its "key fingerprint" should be presented. The "key fingerprint" consists of the first half and second half of the SHA-256 of the public key, XORed together, presented as 2-digit pairs of lowercase hexadecimal digits, separated by colons.</p>
-<p>Clients should be able to import public keys in Base64 form, and servers should be able to import and export both public and private keys in Base64 and raw binary forms. Since public and private keys are both 384 bytes long, at least 512 bytes of Base64 are required. When exporting keys, there should be 64 characters per line.</p>
+<p>Clients should be able to import public keys in Base64 form, and servers should be able to import and export both public and private keys in Base64 and raw binary forms. Since public and private keys are both 384 bytes long, at least 512 bytes of Base64 are required. When exporting keys, there should be 64 characters per line. When importing, non-Base64 characters should be ignored, and a premature '=' should render a key invalid.</p>
 <pre>Example fingerprint:
   f0:e4:c2:f7:6c:58:91:6e:c2:58:f2:46:85:1b:ea:09
 Example Base64 key: (unusable because it is &geq; N)
@@ -199,9 +199,10 @@ The crucial message of the handshake process, whereby the client proves (or disp
 Note to client authors: This specification places no limitations whatsoever on what constitutes a password, but by convention, even on servers and clients that only support some 8-bit encoding, "textual" passwords are in UTF-8. To be compatible with all servers, you should provide <em>some</em> way for users to specify the following types of password:<ul>
 <li>Empty password</li>
 <li>Printable ASCII password</li>
-<li>UTF-8 text password</li>
-<li>Complete contents of a chosen binary file, which fits comfortably in RAM</li>
+<li>Arbitrary UTF-8 text password*</li>
+<li>Complete contents of a chosen binary file, which fits comfortably in RAM*</li>
 </ul>
+*The reference client only implements these as command-line options.<br>
 The vast majority of users will either use an empty password or a printable ASCII password.<br>
 You should securely erase the password from memory as soon as possible after calculating <tt>M</tt>.</li>
 </ul>
@@ -256,6 +257,18 @@ The server should fully support clients that do not have mouse support. Keyboard
 <li><tt>'Sc<i>xy</i>' {}</tt><br>
 Sent by the client to indicate that the mouse wheel was scrolled, or the device-specific equivalent. `x` and `y` are signed bytes. Positive `x` is right, positive `y` is up / away. One unit corresponds to a single detente on a mousewheel.<br>
 The server should fully support clients that do not have mouse support. Keyboard alternatives for all UI actions must be provided.</li>
+<li><tt>'Pbeg' {}</tt><br>
+Sent by the client to indicate that a paste is taking place. During a paste, only the following messages may be sent:<ul>
+<li><tt>'Text'</tt> messages</li>
+<li><tt>'Kp__'</tt>/matching <tt>'Kr__'</tt> messages involving the Tab or Enter key</li>
+<li><tt>'Pend'</tt> (see below)
+</ul>
+The server MAY ignore other messages received between <tt>'Pbeg'</tt> and <tt>'Pend'</tt>, but SHOULD terminate the connection instead.<br>
+The client SHOULD NOT send pastes unless a <tt>'Pon\0'</tt> message has been received from the server, and a <tt>'Poff'</tt> has not been received since then.<br>
+The client SHOULD NOT send the input that initiated the paste (e.g. a middle-mouse press, or the V press in a control-V), but MAY send the inverse afterward (e.g. a middle-mouse release, or the V release in a control-V).<br>
+This is only a hint to the server. It is free to treat paste-related inputs as normal inputs, or unconditionally ignore everything between <tt>'Pbeg'</tt> and <tt>'Pend'</tt>.</li>
+<li><tt>'Pend' {}</tt><br>
+Sent by the client to indicate that a paste has ended.</li>
 </ul>
 <h3>Server to Client</h3>
 <ul>
@@ -330,6 +343,13 @@ Which set of code points is actually used will depend on which encoding the clie
 A Unicode-supporting client will use the Unicode code point if it supports it. If it doesn't (or the Unicode code point was U+FFFD), but the CP437 code point is non-zero, it will use that as a fallback. Otherwise, a special glyph (possibly just a '?') will be used.<br>
 When translating text from an internal encoding <i>to</i> the 8-bit format, when a character with no possible encoding is encountered, it should be entirely skipped.<br>
 When this message is received, previous frame data should be destroyed as if a 'DFRM' message was received.</li>
+<li><tt>'Pon\0' {}</tt><br>
+(Note: The \0 is an ASCII NUL character, a byte with the literal value 0.)<br>
+Sent by the server when it is in a position to receive pasted text. For example, when the cursor is inside an editable text field.<br>
+fter a <tt>'Pon\0'</tt> is received, the client will interpret platform-specific inputs from the user (e.g. a middle-click on X11, command-V on a Mac) as a request to paste, and send inputs between <tt>'Pbeg'</tt> and <tt>'Pend'</tt> messages to recreate any text that might be in their clipboard.<br>
+This is only a hint, but clients MUST NOT interpret any user input as a request to paste, unless between a <tt>'Pon\0'</tt> and <tt>'Poff'</tt> message.</li>
+<li><tt>'Poff' {}</tt><br>
+Sent by the server when it is no longer in a position to receive pasted text. Due to transmission delays, it is not an error for a client to send a paste after a <tt>'Poff'</tt> has been sent. Servers that handle pastes specially at all MUST silently ignore inputs between <tt>'Pbeg'</tt> and <tt>'Pend'</tt> when they are not in a position to receive pasted text.</li>
 </ul>
 <h2><a name="FrameLayout"></a>Frame Layout</h2>
 <h3>8-bit mode</h3>
@@ -393,8 +413,8 @@ In the default state, TTTP encodes all text as CP437 (or an arbitrary 256-charac
 <h3>Bit Twiddling</h3>
 <p>The basic theory is that an attacker knows the user is going to press one key, and wishes the user to press another key instead. A side effect of using OFB mode is that the attacker can flip the corresponding bits in the ciphertext (without decrypting it) and alter the plaintext. This is not considered a workable attack for the following reasons:</p>
 <ul>
-<li>An attacker would need to know which encrypted bytes belonged to the targeted input messages, in a sea of other messages including a constant stream of <tt>'ONES'</tt> messages. This requires knowing the precise timing of the targeted keypress.</li>
-<li>The use of OFB means that a corrupted (or tampered) bit will corrupt all blocks after the block in which it occurred. This means that any tampering will quickly destabilize the connection, making it difficult to perform such tampering undetected. This also means that even an <em>extremely</em> fortunate attacker could compromise, at most, four consecutive keypresses or sixteen bytes of <tt>'Text'</tt>, before the <em>violent termination of the session</em>.</li>
+<li>An attacker would need to know which encrypted bytes belonged to the targeted input messages, in a sea of other messages including a constant stream of <tt>'ONES'</tt> messages. This requires knowing the precise nature and timing of the targeted keypress, including delays in processing the keypress introduced by the hardware, the OS, the input handling layer of the client...</li>
+<li>The use of OFB means that a corrupted (or tampered) bit will corrupt all blocks after the block in which it occurred. This means that any tampering will quickly destabilize the connection, making it impossible to perform such tampering undetected. This also means that even an <em>extremely</em> fortunate attacker could compromise, at most, four consecutive keypresses or sixteen bytes of <tt>'Text'</tt>, before the <em>violent termination of the session</em>.</li>
 <li>The random displacement at the beginning of the encrypted stream prevents an attacker from knowing where block boundaries occur. This means that even an extremely fortunate attacker does not know for sure how many bytes they can compromise before the <em>violent termination of the session</em>.</li>
 </ul>
 <p>A more obvious mode such as ECB or CBC mode was not used because of the requirement to pad to block boundaries, which would increase the bandwidth used by the protocol and otherwise complicate communications, while only protecting against a single attack that requires a large amount of supplementary knowledge (bordering on physical access) to mount.</p>
