@@ -346,7 +346,7 @@ When this message is received, previous frame data should be destroyed as if a '
 <li><tt>'Pon\0' {}</tt><br>
 (Note: The \0 is an ASCII NUL character, a byte with the literal value 0.)<br>
 Sent by the server when it is in a position to receive pasted text. For example, when the cursor is inside an editable text field.<br>
-fter a <tt>'Pon\0'</tt> is received, the client will interpret platform-specific inputs from the user (e.g. a middle-click on X11, command-V on a Mac) as a request to paste, and send inputs between <tt>'Pbeg'</tt> and <tt>'Pend'</tt> messages to recreate any text that might be in their clipboard.<br>
+After a <tt>'Pon\0'</tt> is received, the client will interpret platform-specific inputs from the user (e.g. a middle-click on X11, command-V on a Mac) as a request to paste, and send inputs between <tt>'Pbeg'</tt> and <tt>'Pend'</tt> messages to recreate any text that might be in their clipboard.<br>
 This is only a hint, but clients MUST NOT interpret any user input as a request to paste, unless between a <tt>'Pon\0'</tt> and <tt>'Poff'</tt> message.</li>
 <li><tt>'Poff' {}</tt><br>
 Sent by the server when it is no longer in a position to receive pasted text. Due to transmission delays, it is not an error for a client to send a paste after a <tt>'Poff'</tt> has been sent. Servers that handle pastes specially at all MUST silently ignore inputs between <tt>'Pbeg'</tt> and <tt>'Pend'</tt> when they are not in a position to receive pasted text.</li>
