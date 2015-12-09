@@ -322,7 +322,7 @@ otherwise: delta
 The client must treat the next <tt>'FRAM'</tt> message as "fresh", with no XORing of previous data. This does NOT break continuity of the deflate stream!<br>
 A <tt>'ONES'</tt> message MUST NOT be sent in response to this message, and it MUST NOT trigger an actual screen update. If a blank screen really is desired on the cheap, a blank <tt>'FRAM'</tt> message will follow the <tt>'DFRM'</tt> message.</li>
 <li><tt>'RSET' {} </tt><br>
-The client must reset to the state it was in immediately post handshake. That includes discarding any framebuffer data, resetting its decompression state, forgetting about any past <tt>'Kyrp'</tt> message, resetting the 8-bit encoding to CP437 (if applicable), re-sending <tt>'Queu'</tt>/<tt>'Scrn'</tt>, and resetting the palette to the default.<br>
+The client must reset to the state it was in immediately post handshake. That includes discarding any framebuffer data, resetting its decompression state, forgetting about any past <tt>'Kyrp'</tt> message, resetting the 8-bit encoding to CP437 (if applicable), re-sending <tt>'Queu'</tt>/<tt>'Scrn'</tt>, resetting the palette to the default, and forgetting about any <tt>'Pon\0'</tt> message.<br>
 The client MUST send a 'Rack' message when it receives an 'RSET' message, but the server is not required to make use of this.<br>
 This is useful when implementing a proxy.</li>
 </li>

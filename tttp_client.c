@@ -87,6 +87,7 @@ static const uint32_t default_codepoint_table[256] = {
 };
 
 enum tttp_client_state {
+  CS_DEAD=0,
   CS_INITIALIZED,
   CS_QUERYING, CS_QUERIED,
   CS_FLAG, CS_FLAGGED,
@@ -94,7 +95,7 @@ enum tttp_client_state {
   CS_VERIFY,
   CS_NO_AUTH,
   CS_COMPLETE,
-  CS_DEAD
+  CS_PASTING
 };
 
 struct tttp_client {
@@ -116,10 +117,11 @@ struct tttp_client {
   void(*text_callback)(void* data, const uint8_t* text, size_t len);
   void(*kyrp_callback)(void* data, uint32_t delay, uint32_t interval);
   void(*cdpt_callback)(void* data, const uint32_t encoding[256]);
+  void(*pmode_callback)(void* data, int enabled);
   void(*unknown_callback)(void* data, uint32_t msgid, const uint8_t* msgdata,
                           uint32_t datalen);
   uint8_t* cp437_map, *from_cp437_map;
-  uint8_t queue_depth, have_valid_palette:1;
+  uint8_t queue_depth, have_valid_palette:1, paste_mode_enabled:1;
   uint16_t preferred_width, preferred_height, maximum_width, maximum_height;
   uint32_t negotiated_flags;
   uint32_t message_type, message_len;
@@ -168,7 +170,7 @@ static void kill_state(tttp_client* self) {
       self->zlib.opaque = NULL;
     }
     if(self->tail) {
-      if(self->client_state == CS_COMPLETE) {
+      if(self->client_state >= CS_COMPLETE) {
         lsx_destroy_twofish256(&self->tail->crypto.twofish);
         lsx_explicit_bzero(self->tail, sizeof(self->tail->crypto));
       }
@@ -274,7 +276,7 @@ static void encrypt(tttp_client* self, uint8_t* p, size_t rem) {
 }
 
 static int send_data(tttp_client* self, uint8_t* send_buf, size_t len) {
-  if(self->client_state != CS_COMPLETE
+  if(self->client_state < CS_COMPLETE
      || !(self->negotiated_flags & TTTP_FLAG_ENCRYPTION))
     return self->send_callback(self->cbdata, send_buf, len);
   encrypt(self, send_buf, len);
@@ -282,7 +284,7 @@ static int send_data(tttp_client* self, uint8_t* send_buf, size_t len) {
 }
 
 static int receive_data(tttp_client* self, uint8_t* recv_buf, size_t len) {
-  if(self->client_state != CS_COMPLETE
+  if(self->client_state < CS_COMPLETE
      || !(self->negotiated_flags & TTTP_FLAG_ENCRYPTION))
     return self->receive_callback(self->cbdata, recv_buf, len);
   int red = self->receive_callback(self->cbdata, recv_buf, len);
@@ -454,11 +456,13 @@ tttp_client* tttp_client_init(void* data,
   ret->text_callback = NULL;
   ret->kyrp_callback = NULL;
   ret->cdpt_callback = NULL;
+  ret->pmode_callback = NULL;
   ret->unknown_callback = NULL;
   ret->cp437_map = CP437_MAP_DEFAULT;
   ret->from_cp437_map = NULL;
   ret->queue_depth = 0;
   ret->have_valid_palette = 0;
+  ret->paste_mode_enabled = 0;
   ret->preferred_width = 0;
   ret->preferred_height = 0;
   ret->maximum_width = 0;
@@ -495,6 +499,7 @@ void tttp_client_change_data_pointer(tttp_client* self, void* data) {
 void tttp_client_set_queue_depth(tttp_client* self, uint8_t depth) {
   switch(self->client_state) {
   case CS_DEAD: FATAL_DEAD_STATE(self);
+  case CS_PASTING: FATAL_WRONG_STATE(self);
   case CS_COMPLETE:
     if(self->queue_depth != depth) {
       uint8_t buf[6] = {'Q' | 0x80, 'u', 'e', 'u', 1, depth};
@@ -516,6 +521,7 @@ void tttp_client_set_screen_params(tttp_client* self,
   if(!maximum_width || !maximum_height)
     maximum_height = maximum_width = 0;
   switch(self->client_state) {
+  case CS_PASTING: FATAL_WRONG_STATE(self);
   case CS_COMPLETE:
     if(self->preferred_width != preferred_width
        || self->preferred_height != preferred_height
@@ -1062,6 +1068,13 @@ void tttp_client_set_cdpt_callback(tttp_client* self,
   self->cdpt_callback = cdpt;
 }
 
+void tttp_client_set_paste_mode_callback(tttp_client* self,
+                                         void(*pmode)(void* data,
+                                                      int enabled)) {
+  if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
+  self->pmode_callback = pmode;
+}
+
 void tttp_client_set_unknown_callback(tttp_client* self,
                                       void(*unknown)(void* data,
                                                      uint32_t msgid,
@@ -1079,7 +1092,7 @@ void tttp_client_set_autocp437(tttp_client* self, int mode) {
     self->cp437_map = NULL;
   }
   else if(!self->cp437_map) {
-    if(self->client_state == CS_COMPLETE)
+    if(self->client_state >= CS_COMPLETE)
       fatal(self, "%s: attempt to re-enable autocp437 after \"complete\""
             " state was entered", __FUNCTION__);
     self->cp437_map = CP437_MAP_DEFAULT;
@@ -1352,6 +1365,14 @@ int tttp_client_pump(tttp_client* self) {
           }
         }
         goto destroy_frame;
+      case 'Pon\0':
+        if(self->pmode_callback) self->pmode_callback(self->cbdata, 1);
+        self->paste_mode_enabled = 1;
+        break;
+      case 'Poff':
+        if(self->pmode_callback) self->pmode_callback(self->cbdata, 0);
+        self->paste_mode_enabled = 0;
+        break;
       default:
         if(self->unknown_callback) {
           self->unknown_callback(self->cbdata, self->message_type,
@@ -1369,9 +1390,30 @@ int tttp_client_pump(tttp_client* self) {
   return 0;
 }
 
+void tttp_client_begin_paste(tttp_client* self) {
+  if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
+  else if(self->client_state != CS_COMPLETE
+          || !self->paste_mode_enabled) FATAL_WRONG_STATE(self);
+  uint8_t buf[4] = {'P', 'b', 'e', 'g'};
+  send_data(self, buf, sizeof(buf));
+  self->client_state = CS_PASTING;
+}
+
+void tttp_client_end_paste(tttp_client* self) {
+  if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
+  else if(self->client_state != CS_PASTING) FATAL_WRONG_STATE(self);
+  uint8_t buf[4] = {'P', 'e', 'n', 'd'};
+  send_data(self, buf, sizeof(buf));
+  self->client_state = CS_PASTING;
+}
+
 void tttp_client_send_key(tttp_client* self, tttp_press_status status,
                           uint16_t scancode) {
   if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
+  else if(self->client_state == CS_PASTING
+          && scancode != '\n' && scancode != '\t')
+    fatal(self, "%s: key message not involving enter or tab during paste",
+          __FUNCTION__);
   else if(self->client_state != CS_COMPLETE) FATAL_WRONG_STATE(self);
   if(status == TTTP_PRESS || status == TTTP_TAP) {
     uint8_t buf[4] = {'K', 'p', scancode>>8, scancode};
@@ -1385,7 +1427,8 @@ void tttp_client_send_key(tttp_client* self, tttp_press_status status,
 
 void tttp_client_send_text(tttp_client* self, uint8_t* text, size_t textlen) {
   if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
-  else if(self->client_state != CS_COMPLETE) FATAL_WRONG_STATE(self);
+  else if(self->client_state != CS_COMPLETE
+          && self->client_state != CS_PASTING) FATAL_WRONG_STATE(self);
   if(textlen == 0)
     fatal(self, "%s: Attempt to send empty 'Text'",__FUNCTION__);
   else if(textlen > TTTP_MAX_DATA_SIZE)

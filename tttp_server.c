@@ -41,8 +41,11 @@ struct tttp_server {
   void(*mbtn_callback)(void* data, int pressed, uint16_t button);
   void(*scrl_callback)(void* data, int8_t x, int8_t y);
   void(*text_callback)(void* data, const uint8_t* text, size_t len);
+  void(*pbeg_callback)(void* data);
+  void(*pend_callback)(void* data);
   void(*unknown_callback)(void* data, uint32_t msgid, const uint8_t* msgdata,
                           uint32_t datalen);
+  uint8_t pasting_allowed:1, paste_in_progress:1;
   uint32_t negotiated_flags;
   uint32_t message_type, message_len;
   uint16_t last_width, last_height;
@@ -380,7 +383,11 @@ tttp_server* tttp_server_init(void* data,
   ret->mbtn_callback = NULL;
   ret->scrl_callback = NULL;
   ret->text_callback = NULL;
+  ret->pbeg_callback = NULL;
+  ret->pend_callback = NULL;
   ret->unknown_callback = NULL;
+  ret->pasting_allowed = 0;
+  ret->paste_in_progress = 0;
   ret->negotiated_flags = 0;
   ret->last_width = 0;
   ret->last_height = 0;
@@ -868,6 +875,14 @@ void tttp_server_set_scroll_callback(tttp_server* self,
   self->scrl_callback = scrl;
 }
 
+void tttp_server_set_paste_callbacks(tttp_server* self,
+                                     void(*pbeg)(void* data),
+                                     void(*pend)(void* data)) {
+  if(self->server_state == SS_DEAD) FATAL_DEAD_STATE(self);
+  self->pbeg_callback = pbeg;
+  self->pend_callback = pend;
+}
+
 void tttp_server_set_unknown_callback(tttp_server* self,
                                       void(*unknown)(void* data,
                                                      uint32_t msgid,
@@ -875,6 +890,26 @@ void tttp_server_set_unknown_callback(tttp_server* self,
                                                      uint32_t datalen)) {
   if(self->server_state == SS_DEAD) FATAL_DEAD_STATE(self);
   self->unknown_callback = unknown;
+}
+
+void tttp_server_allow_paste(tttp_server* self) {
+  if(self->server_state == SS_DEAD) FATAL_DEAD_STATE(self);
+  else if(self->server_state != SS_COMPLETE) FATAL_WRONG_STATE(self);
+  if(!self->pasting_allowed) {
+    uint8_t buf[4] = {'P', 'o', 'n', 0};
+    send_data(self, buf, sizeof(buf));
+    self->pasting_allowed = 1;
+  }
+}
+
+void tttp_server_forbid_paste(tttp_server* self) {
+  if(self->server_state == SS_DEAD) FATAL_DEAD_STATE(self);
+  else if(self->server_state != SS_COMPLETE) FATAL_WRONG_STATE(self);
+  if(self->pasting_allowed) {
+    uint8_t buf[4] = {'P', 'o', 'f', 'f'};
+    send_data(self, buf, sizeof(buf));
+    self->pasting_allowed = 0;
+  }
 }
 
 void tttp_server_send_palette(tttp_server* self,
@@ -1092,6 +1127,16 @@ int tttp_server_pump(tttp_server* self) {
     case -1: return 0;
     case 0: return 1;
     case 1:
+      if(self->paste_in_progress) {
+        if(self->message_type != 'Pend' && self->message_type != 'Text'
+           && self->message_type != 'Kp\0\n' && self->message_type != 'Kr\0\n'
+           && self->message_type != 'Kp\0\t' && self->message_type !='Kr\0\t'){
+          foul(self, "Received inappropriate message during paste");
+          return 0;
+        }
+        else if(!self->pasting_allowed && self->message_type != 'Pend')
+          break; // ignore
+      }
       switch(self->message_type) {
       case 'Scrn':
         if(self->message_len < 8) {
@@ -1148,6 +1193,20 @@ int tttp_server_pump(tttp_server* self) {
             |(self->message_data_ptr[3]);
           self->mous_callback(self->cbdata, x, y);
         }
+        break;
+      case 'Pbeg':
+        if(self->pbeg_callback) self->pbeg_callback(self->cbdata);
+        if(self->paste_in_progress)
+          foul(self, "nested Pbeg");
+        else
+          self->paste_in_progress = 1;
+        break;
+      case 'Pend':
+        if(self->pend_callback) self->pend_callback(self->cbdata);
+        if(!self->paste_in_progress)
+          foul(self, "spurious Pend");
+        else
+          self->paste_in_progress = 0;
         break;
       default:
         if((self->message_type & 0x7F7F0000) == 'Kp\0\0'

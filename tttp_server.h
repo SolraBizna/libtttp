@@ -240,6 +240,13 @@ void tttp_server_set_mouse_button_callback(tttp_server* self,
 void tttp_server_set_scroll_callback(tttp_server* self,
                                      void(*scrl)(void* data,
                                                  int8_t x, int8_t y));
+/* Sets the callbacks called when the client begins (`pbeg`) or ends (`pend`) a
+   paste. During a paste, only key messages (involving enter/tab) and text
+   messages will be received. Pastes will never be received unless you call
+   `tttp_server_allow_paste`. */
+void tttp_server_set_paste_callbacks(tttp_server* self,
+                                     void(*pbeg)(void* data),
+                                     void(*pend)(void* data));
 /* Sets the callback called when a message with an unknown identifier is
    received. (May be NULL)
    Unlike most other callbacks, this will be called WHENEVER a message with
@@ -260,6 +267,24 @@ void tttp_server_set_unknown_callback(tttp_server* self,
    Returns: 1 if the connection is still alive and kicking, 0 if it is over. */
 int tttp_server_pump(tttp_server* self);
 
+/* Sends a 'Pon\0' message to the client, indicating that pasting is currently
+   possible. Pastes will be ignored unless this is called. You should not call
+   this unless the cursor is *currently* inside a text field, or some logically
+   equivalent situation; when pasting is allowed, the client will process and
+   suppress the inputs that lead to a paste, in a platform-specific way!
+
+   It is NOT an error to call this when pasting is already allowed, and such a
+   call will NOT result in a spurious 'Pon\0' message being sent. However, no
+   matter how many times `tttp_server_allow_paste` is called, a single
+   `tttp_server_forbid_paste` will disable pasting. The calls are not counted.
+*/
+void tttp_server_allow_paste(tttp_server* self);
+/* Sends a 'Poff' message to the client, indicating that pasting is no longer
+   possible.
+
+   It is NOT an error to call this when pasting is already forbidden, and such
+   a call will NOT result in a spurious 'Poff' message being sent. */
+void tttp_server_forbid_paste(tttp_server* self);
 /* Send a palette to the client. If this is never called, the default palette
    will be assumed.
 

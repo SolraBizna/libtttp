@@ -229,6 +229,12 @@ void tttp_client_set_kyrp_callback(tttp_client* self,
 void tttp_client_set_cdpt_callback(tttp_client* self,
                                    void(*cdpt)(void* data,
                                                const uint32_t encoding[256]));
+/* Sets the callback called when a 'Pon\0'/'Poff' message is received,
+   indicating that the server is or is not (respectively) receptive to pastes.
+   It is an error to send a paste when not between 'Pon\0' and 'Poff'. */
+void tttp_client_set_paste_mode_callback(tttp_client* self,
+                                         void(*pmode)(void* data,
+                                                      int enabled));
 /* Sets the callback called when a message with an unknown identifier is
    received. (May be NULL)
    Unlike most other callbacks, this will be called WHENEVER a message with
@@ -253,6 +259,14 @@ void tttp_client_set_autocp437(tttp_client* self, int mode);
 /* Operates the `tttp_client` instance in its "complete" state.
    Returns: 1 if the connection is still alive and kicking, 0 if it is over. */
 int tttp_client_pump(tttp_client* self);
+/* Begins a "paste". This must only be done when the pmode callback has been
+   called with 1 as parameter, and not subsequently called with 0.
+   During a paste, only `tttp_client_send_key` (involving KEY_ENTER/KEY_TAB)
+   and `tttp_client_send_text` may be called. The paste will end when
+   `tttp_client_end_paste` is called. */
+void tttp_client_begin_paste(tttp_client* self);
+/* Ends a "paste". */
+void tttp_client_end_paste(tttp_client* self);
 
 /* Send a key press, key release, or both to the server.
 
