@@ -274,35 +274,34 @@ Sent by the client to indicate that a paste has ended.</li>
 <h3>Server to Client</h3>
 <ul>
 <li><tt>'PLTT' { uint8_t colors[]; }</tt><br>
-Specifies the entire current color palette of the server. There must be between 2 and 16 colors (or no data), each of which is made up of an 8-bit red, green, and blue value in the sRGB colorspace.<br>
+Specifies the entire current color palette of the server. There must be between 2 and 16 colors (or no data), each of which is made up of an 8-bit red, green, and blue value in the sRGB colorspace (or "close enough").<br>
 Changing the palette does NOT destroy the frame. Existing color <i>indices</i> and data are preserved. Reinterpretation may take place immediately, or may be deferred until the next <tt>'FRAM'</tt>.<br>
-If no data is given, the default palette is to be used.<br>
 If there are at least one but fewer than 16 colors specified, the missing colors are repeats of the first color. If the number of bytes of data is not a multiple of 3, the "remainder" bytes are ignored.<br>
-It is valid, but silly, to specify only one color.<br>
 As with other messages, extra data is ignored. In this case, extra data would be any data after enough to specify 16 colors.<br>
-When a connection is first made, this is the default palette:<table>
+When a connection is first made, or an empty <tt>'PLTT'</tt> is received, this is the palette used:<table>
 <thead>
 <tr><th><abbr title="Index">Id</abbr></th><th>Color</th><th><abbr title="Index">Id</abbr></th><th>Color</th><th><abbr title="Index">Id</abbr></th><th>Color</th><th><abbr title="Index">Id</abbr></th><th>Color</th></tr>
 </thead>
 <tbody>
-<tr><td>0</td><td style="color:#000000; background-color:#ffffff">#000000</td>
-<td>1</td><td style="color:#800000; background-color:#ffffff">#800000</td>
-<td>2</td><td style="color:#008000; background-color:#ffffff">#008000</td>
-<td>3</td><td style="color:#808000; background-color:#ffffff">#808000</td></tr>
-<tr><td>4</td><td style="color:#000080; background-color:#ffffff">#000080</td>
-<td>5</td><td style="color:#800080; background-color:#ffffff">#800080</td>
-<td>6</td><td style="color:#008080; background-color:#ffffff">#008080</td>
-<td>7</td><td style="color:#808080; background-color:#ffffff">#808080</td></tr>
-<tr><td>8</td><td style="color:#606060; background-color:#ffffff">#606060</td>
-<td>9</td><td style="color:#FF0000; background-color:#000000">#FF0000</td>
-<td>10</td><td style="color:#00FF00; background-color:#000000">#00FF00</td>
-<td>11</td><td style="color:#FFFF00; background-color:#000000">#FFFF00</td></tr>
-<tr><td>12</td><td style="color:#0000FF; background-color:#000000">#0000FF</td>
-<td>13</td><td style="color:#FF00FF; background-color:#000000">#FF00FF</td>
-<td>14</td><td style="color:#00FFFF; background-color:#000000">#00FFFF</td>
-<td>15</td><td style="color:#FFFFFF; background-color:#000000">#FFFFFF</td></tr>
+<tr><td>0</td><td style="color:#ffffff; background-color:#000000">#000000</td>
+<td>1</td><td style="color:#ffffff; background-color:#aa0000">#AA0000</td>
+<td>2</td><td style="color:#ffffff; background-color:#00aa00">#00AA00</td>
+<td>3</td><td style="color:#ffffff; background-color:#aa5500">#AA5500</td></tr>
+<tr><td>4</td><td style="color:#ffffff; background-color:#0000aa">#0000AA</td>
+<td>5</td><td style="color:#ffffff; background-color:#aa00aa">#AA00AA</td>
+<td>6</td><td style="color:#ffffff; background-color:#00aaaa">#00AAAA</td>
+<td>7</td><td style="color:#000000; background-color:#aaaaaa">#AAAAAA</td></tr>
+<tr><td>8</td><td style="color:#ffffff; background-color:#555555">#555555</td>
+<td>9</td><td style="color:#000000; background-color:#ff5555">#FF5555</td>
+<td>10</td><td style="color:#000000; background-color:#55ff55">#55FF55</td>
+<td>11</td><td style="color:#000000; background-color:#ffff55">#FFFF55</td></tr>
+<tr><td>12</td><td style="color:#ffffff; background-color:#5555ff">#5555FF</td>
+<td>13</td><td style="color:#000000; background-color:#ff55ff">#FF55FF</td>
+<td>14</td><td style="color:#000000; background-color:#55ffff">#55FFFF</td>
+<td>15</td><td style="color:#000000; background-color:#ffffff">#FFFFFF</td></tr>
 </tbody>
-</table></li>
+</table>
+This palette is based on the CGA RGBI palette. The colors are in the order standardized in ISO/IEC 6429 "Information technology &mdash; Control functions for coded character sets", and used by color-capable terminals implementing same.</li>
 <li><tt>'FRAM' { uint16_t width, height; uint8_t data[]; }</tt><br>
 If this is the first <tt>'FRAM'</tt> message or the previous <tt>'FRAM'</tt> message had a different width or height, this contains the frame data directly; otherwise, this contains the "delta" of each byte from the previous byte. Either way, the data is compressed with deflate as implemented by zlib and specified in RFC 1951, and the uncompressed size can be calculated from width and height. It is an error to provide more than this amount of data.<br>
 The compressed 'FRAM' packets received over the lifetime of a single connection make up a single deflate bitstream.<br>
