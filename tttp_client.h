@@ -123,6 +123,18 @@ tttp_handshake_result tttp_client_query_server(tttp_client* self,
    flags: Bitwise-OR combination of TTTP_FLAG_* values. A reasonable
    default is TTTP_FLAG_ENCRYPTION.
 
+   After `tttp_client_pump_flags` returns `TTTP_HANDSHAKE_ADVANCE`, you MUST
+   call `tttp_client_get_flags` and handle the connection based on those flags.
+   If it contains flags that you did not set, those flags are required; if you
+   do not support those flags, you should probably terminate the connection. If
+   it does not contain flags that you did set, those flags are not supported...
+   and you should either do without them or terminate the connection. In either
+   case, you are free to call `tttp_client_request_flags` again and go through
+   the loop again, to see if you can get a combination of flags you are happy
+   with. (Don't make an infinite loop. Looping negotiation does not make sense
+   with any _current_ flags in the specification, but might become useful in
+   the future.)
+
    If you want to negotiate encryption, you MUST use authentication. If you
    want to use authentication, you MUST provide a public key to
    `tttp_client_begin_handshake`. */
