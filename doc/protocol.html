@@ -378,7 +378,7 @@ Once 16 bytes have been encrypted and sent in this manner, the corresponding cip
 <li><tt>0x00000002</tt>: Unicode mode<br>
 In the default state, TTTP encodes all text as CP437 (or an arbitrary 256-character subset of Unicode). With Unicode mode enabled, all text is transmitted as UTF-8 and the frame layout is quite different. (See <a href="#FrameLayout">Frame Layout</a>.)</li>
 <li><tt>0x00000004</tt>: Reserved for future improvement of the Unicode mode<br>
-This flag will affect interpretation of the <tt>'FRAM'</tt> (in Unicode mode) and <tt>'CDPT'</tt> (in any mode) messages, and may introduce additional critical messages. A future version of this spec will define the full effects of this flag.</li>
+This flag will affect interpretation of the <tt>'FRAM'</tt> (in Unicode mode) and <tt>'CDPT'</tt> (in any mode) messages, and may introduce additional critical messages. A future version of this spec will define the full effects of this flag, <em>or may remove/repurpose it</em> and incorporate all changes directly into Unicode mode.</li>
 <li><tt>0x80000000</tt>: Reserved for future changes relating to "flexible crypto"<br>
 The presence of this flag will indicate that authentication or encryption is different, in an incompatible way. A future version of this spec will define the full effects of this flag.<br>
 Servers <em>and</em> clients SHOULD require this flag, if Twofish-256, SHA-256, SRP-Z, or any of the ways they are used here are found to be insecure (or illegal).<br>
