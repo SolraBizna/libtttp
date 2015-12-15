@@ -342,7 +342,8 @@ The middle 3 bits are reserved and should always be 0.<br>
 Which set of code points is actually used will depend on which encoding the client uses internally. Applications that depend on Unicode support via 8-bit mode should prompt the user to confirm that all relevant characters are being displayed.<br>
 A Unicode-supporting client will use the Unicode code point if it supports it. If it doesn't (or the Unicode code point was U+FFFD), but the CP437 code point is non-zero, it will use that as a fallback. Otherwise, a special glyph (possibly just a '?') will be used.<br>
 When translating text from an internal encoding <i>to</i> the 8-bit format, when a character with no possible encoding is encountered, it should be entirely skipped.<br>
-When this message is received, previous frame data should be destroyed as if a 'DFRM' message was received.</li>
+When this message is received, previous frame data should be destroyed as if a 'DFRM' message was received.<br>
+See the <a href="#UnicodeMode">Unicode mode</a> section for information that applies to parts of Unicode (but not CP437).</li>
 <li><tt>'Pon\0' {}</tt><br>
 (Note: The \0 is an ASCII NUL character, a byte with the literal value 0.)<br>
 Sent by the server when it is in a position to receive pasted text. For example, when the cursor is inside an editable text field.<br>
@@ -357,12 +358,14 @@ Sent by the server when it is no longer in a position to receive pasted text. Du
 <p>Unless the encoding has been altered by a <tt>'CDPT'</tt> message, the character encoding is CP437.</p>
 <h3>Unicode mode</h3>
 <p>Unicode TTTP frames are stored tightly packed. As above, the layout is row-major. Each character cell is a 32-bit quantity. The upper 4 bits are the foreground color and the next 4 bits are the background color. The next 3 bits are reserved and should always be 0. This leaves 21 bits to encode a Unicode code point.</p>
-<p>Earlier versions of the protocol had a mixed 16-bit Unicode mode that did not support characters outside the BMP. This mode has been removed. A program supporting Unicode should endeavor to support it as completely as possible.</p>
-<p>The current protocol has a major problem, in that it is only capable of displaying glyphs that correspond to a single Unicode code point. I'm not aware of any way of solving this problem, while keeping the "character cell grid" concept. It also cannot adequately handle "full width" characters (such as CJK characters), or cursive scripts (such as Arabic).</p>
+<p>Earlier versions of the protocol had a mixed 16-bit Unicode mode that did not support characters outside the BMP. This mode has been removed. A program supporting Unicode should endeavor to support it as completely as possible, including the Astral Planes.</p>
+<p>When a character cell contains a "full width" character, the character takes up that cell and the following cell. The color and code point of the following cell are then <i>ignored</i>. When a cell contains a non-printing character, a combining character, an invalid character, or an unsupported character, an appropriate fallback glyph MUST be displayed, such as U+FFFD (<tt>'&#65533;'</tt>). Character cells in the buffer are stored left-to-right, regardless of the directionality of the glyphs.</p>
+<p>To the degree possible, "cursive" scripts should be rendered correctly, and all rendering should be resilient in the face of incremental updates. This may require redrawing some cells that did not change, if they are affected by cells that did.</p>
+<p>The current protocol has a major problem, in that it is only capable of displaying glyphs that correspond to a single Unicode code point. I'm not aware of any way of solving this problem, while keeping the "character cell grid" concept. A future version of the protocol may have a solution, making use of the reserved 3 bits in some way.</p>
 <h2><a name="FeatureFlag"></a>Feature Flags</h2>
 <p>There are a number of features which alter the specification of the protocol. These are enabled during the handshake process, and currently all have no effect until after the handshake is complete.</p>
-<p>All feature flags start out disabled. All servers must be able to operate in this state&mdash;at least well enough to inform clients that certain features (e.g. encryption) are required.</p>
-<p>All servers must ignore feature flags they do not understand.</p>
+<p>All servers MUST be able to operate with no flags&mdash;well enough, at least, to inform clients that certain flags (e.g. encryption) are required.</p>
+<p>Servers must not allow feature flags they do not understand.</p>
 <ul>
 <li><tt>0x00000001</tt>: Encryption<br>
 With this feature enabled, the connection is encrypted in both directions.<br>
@@ -374,8 +377,14 @@ Once 16 bytes have been encrypted and sent in this manner, the corresponding cip
 * These digits come from the hexadecimal expansion of pi.</li>
 <li><tt>0x00000002</tt>: Unicode mode<br>
 In the default state, TTTP encodes all text as CP437 (or an arbitrary 256-character subset of Unicode). With Unicode mode enabled, all text is transmitted as UTF-8 and the frame layout is quite different. (See <a href="#FrameLayout">Frame Layout</a>.)</li>
+<li><tt>0x00000004</tt>: Reserved for future improvement of the Unicode mode<br>
+This flag will affect interpretation of the <tt>'FRAM'</tt> (in Unicode mode) and <tt>'CDPT'</tt> (in any mode) messages, and may introduce additional critical messages. A future version of this spec will define the full effects of this flag.</li>
+<li><tt>0x80000000</tt>: Reserved for future changes relating to "flexible crypto"<br>
+The presence of this flag will indicate that authentication or encryption is different, in an incompatible way. A future version of this spec will define the full effects of this flag.<br>
+Servers <em>and</em> clients SHOULD require this flag, if Twofish-256, SHA-256, SRP-Z, or any of the ways they are used here are found to be insecure (or illegal).<br>
+Clients SHOULD, if a server indicates that this flag is required, give up on the connection with an appropriate message, informing the user that their client is "too insecure" for the server and should be updated to a newer version if possible.</li>
 </ul>
-<p>Third-party developers who wish to add feature flags to their extended versions of the protocol should contact me; I will ensure that collisions are avoided, and (if relevant) document the third-party feature flags in the spec.</p>
+<p>Third-party developers who wish to add feature flag "bits" to their extended versions of the protocol should contact me; I will ensure that collisions are avoided, and (if relevant) document the third-party feature flag "bits" in the spec.</p>
 <h2>Attacks</h2>
 <p>Disclaimer: I am not a cryptologist. TTTP has not been evaluated by a cryptologist, nor has anything I say below.</p>
 <p>Feature flag choices and the username to authenticate with are never encrypted. An eavesdropper may be able to exploit this information.</p>

@@ -38,10 +38,13 @@ extern "C" {
    authentication.)
    Servers might, whether on a user-by-user basis
    or in general, refuse to accept non-encrypted connections entirely. */
-#define TTTP_FLAG_ENCRYPTION 1
-
+#define TTTP_FLAG_ENCRYPTION 0x00000001
 /* Whether we are in Unicode mode. */
-#define TTTP_FLAG_UNICODE 2
+#define TTTP_FLAG_UNICODE 0x00000002
+/* Flags currently not supported. Will be used in future, and will keep their
+   current names. */
+#define TTTP_FLAG_FUTURE_UNICODE 0x00000004
+#define TTTP_FLAG_FUTURE_CRYPTO 0x80000000
 
 /* A bitmask containing every "known" flag. Servers receiving requests for
    other flags will ignore them. Clients receiving a 'FLAG' message from the
