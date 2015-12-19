@@ -354,6 +354,7 @@ f:write[[
 #define TTTP_SCANCODES_H
 
 enum tttp_scancode {
+  KEY_INVALID = 0x000, // "no scancode", for use in APIs only
 ]]
 
 for n=1,#codes do

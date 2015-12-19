@@ -2,6 +2,7 @@
 #define TTTP_SCANCODES_H
 
 enum tttp_scancode {
+  KEY_INVALID = 0x000, // "no scancode", for use in APIs only
   KEY_BACKSPACE = 0x008,
   KEY_TAB = 0x009,
   KEY_ENTER = 0x00a,
