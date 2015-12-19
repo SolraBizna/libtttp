@@ -412,7 +412,7 @@ f:write[[
 </head>
 <body>
 <p>Here is a list of relevant scancodes for TTTP keyboard messages. The ones from 0x00-0x7F correspond 1:1 with ASCII characters or control codes; the rest correspond 1:1 to usages from the USB HID Keyboard/Keypad page, plus 128. If a scancode is not in this table, a client should not generate it, and a server should disregard it.</p>
-<p>Note: There is no Break scancode. Clients sending a Break should send a left control press (ONLY if it is not already pressed), a Pause press, a Pause release, and a left control release (ONLY if it was not already pressed). Some PC laptop keyboards have an Fn key combination that simulates Break; as far as I can tell, these simulate it in the way described above.</p>
+<p>Note: There is no Break scancode. USB keyboards with a Break key send a left control press (ONLY if it was not already pressed), a Pause press, a Pause release, and a left control release (ONLY if it was not already pressed). This is irrelevant to TTTP as Break must always quit the client.</p>
 <table>
 <thead><tr><th rowspan="2">&nbsp;</th><th class="evencol">0</th><th>1</th><th class="evencol">2</th><th>3</th><th class="evencol">4</th><th>5</th><th class="evencol">6</th><th>7</th></tr><tr><th class="evencol">8</th><th>9</th><th class="evencol">A</th><th>B</th><th class="evencol">C</th><th>D</th><th class="evencol">E</th><th>F</th></tr></thead>
 <tbody>
