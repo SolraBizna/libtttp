@@ -1,6 +1,6 @@
 -- This is kinda messy. Not meant to be modified by anyone but me.
 
-local footnotemap = {ascii=1,mod=2,meta=3,numlockdep=4,intl=5,ee=6,wtf=7,calc=8,clearoverload=9}
+local footnotemap = {ascii=1,mod=2,meta=3,numlockdep=4,intl=5,ee=6,wtf=7,calc=8,clearoverload=9,pausebrk=10}
 
 local asciimap = {}
 
@@ -107,7 +107,7 @@ local usagetable = {
    safe"F12",
    "PrintScreen",
    nil, -- Scroll Lock
-   "Pause",
+   footnote("Pause","pausebrk"),
    "Insert",
    "Home",
    "Page Up",
@@ -412,6 +412,7 @@ f:write[[
 </head>
 <body>
 <p>Here is a list of relevant scancodes for TTTP keyboard messages. The ones from 0x00-0x7F correspond 1:1 with ASCII characters or control codes; the rest correspond 1:1 to usages from the USB HID Keyboard/Keypad page, plus 128. If a scancode is not in this table, a client should not generate it, and a server should disregard it.</p>
+<p>Note: There is no Break scancode. Clients sending a Break should send a left control press (ONLY if it is not already pressed), a Pause press, a Pause release, and a left control release (ONLY if it was not already pressed). Some PC laptop keyboards have an Fn key combination that simulates Break; as far as I can tell, these simulate it in the way described above.</p>
 <table>
 <thead><tr><th rowspan="2">&nbsp;</th><th class="evencol">0</th><th>1</th><th class="evencol">2</th><th>3</th><th class="evencol">4</th><th>5</th><th class="evencol">6</th><th>7</th></tr><tr><th class="evencol">8</th><th>9</th><th class="evencol">A</th><th>B</th><th class="evencol">C</th><th>D</th><th class="evencol">E</th><th>F</th></tr></thead>
 <tbody>
@@ -446,14 +447,15 @@ f:write[[
 </table>
 <ol>
 <li><a name="foot1"></a>These keys will normally generate corresponding ASCII-mapped codes, possibly in a layout-dependent way.</li>
-<li><a name="foot2"></a>These keys act as modifiers. The client sends a press when the modifier becomes active, and a release when it becomes inactive. Modifiers should never change which scancodes are <i>sent</i>---for inputting text, 'Text' messages should be used.</li>
-<li><a name="foot3"></a>This key corresponds to the Windows key on Windows keyboards, the Command key on Apple keyboards, and the Meta key on awesome keyboards. You should not count on this key being available.</li>
-<li><a name="foot4"></a>These keys may instead generate ASCII-mapped codes, depending on the state of Num Lock in a client-specific way.</li>
+<li><a name="foot2"></a>The various Lock keys act as modifiers. The client sends a press when the modifier becomes active, and a release when it becomes inactive. Modifiers should never change which scancodes are <i>sent</i>---for inputting text, 'Text' messages should be used. (Exception: Num Lock and keypad keys.)</li>
+<li><a name="foot3"></a>The GUI key corresponds to the Windows key on Windows keyboards, the Command key on Apple keyboards, and the Meta key on awesome keyboards. You should not count on this key being available.</li>
+<li><a name="foot4"></a>Keypad keys may instead generate ASCII-mapped codes, depending on the state of Num Lock in a client-specific way.</li>
 <li><a name="foot5"></a>These keys are normally of interest only to IME.</li>
 <li><a name="foot6"></a>This corresponds to the "left space" AKA "Eaze-Erase&#8482;" key on certain keyboards.</li>
-<li><a name="foot7"></a>This key should normally be indistinguishable from Enter, and send a newline instead.</li>
+<li><a name="foot7"></a>The Return key should normally be indistinguishable from Enter, and send a newline instead.</li>
 <li><a name="foot8"></a>These keys are normally found only on "math keypads", e.g. calculators.</li>
-<li><a name="foot9"></a>This key corresponds to Num Lock on most PC keyboards, and will therefore unavoidably toggle Num Lock. This sucks.</li>
+<li><a name="foot9"></a>The Clear key corresponds to Num Lock on most PC keyboards, and will therefore unavoidably toggle Num Lock. This sucks.</li>
+<li><a name="foot10"></a>This is not mentioned in the standards, but most PC keyboards do not generate a release for the Pause key. Most OSes synthesize one. Client authors should check to make sure this is done, and if it isn't, they MUST synthesize one themselves.</li>
 </ol>
 </body>
 </html>
