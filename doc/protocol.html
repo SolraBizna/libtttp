@@ -266,8 +266,8 @@ Sent by the client to indicate that a paste is taking place. During a paste, onl
 </ul>
 The server MAY ignore other messages received between <tt>'Pbeg'</tt> and <tt>'Pend'</tt>, but SHOULD terminate the connection instead.<br>
 The client SHOULD NOT send pastes unless a <tt>'Pon\0'</tt> message has been received from the server, and a <tt>'Poff'</tt> has not been received since then.<br>
-The client SHOULD NOT send the input that initiated the paste (e.g. a middle-mouse press, or the V press in a control-V), but MAY send the inverse afterward (e.g. a middle-mouse release, or the V release in a control-V).<br>
-This is only a hint to the server. It is free to treat paste-related inputs as normal inputs, or unconditionally ignore everything between <tt>'Pbeg'</tt> and <tt>'Pend'</tt>.</li>
+The client SHOULD NOT send a keypress that initiates a paste (e.g. the V press in a control-V), but MAY send the inverse afterward (e.g. the V release in a control-V). The client SHOULD send the input that initiated the paste if it is a mouse button press (e.g. middle click under X11).<br>
+This is only a hint to the server. It is free to treat pasted inputs as normal inputs, or unconditionally ignore everything between <tt>'Pbeg'</tt> and <tt>'Pend'</tt>.</li>
 <li><tt>'Pend' {}</tt><br>
 Sent by the client to indicate that a paste has ended.</li>
 </ul>
