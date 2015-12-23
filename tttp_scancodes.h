@@ -1,6 +1,10 @@
 #ifndef TTTP_SCANCODES_H
 #define TTTP_SCANCODES_H
 
+#if __cplusplus
+extern "C" {
+#endif
+
 enum tttp_scancode {
   KEY_INVALID = 0x000, // "no scancode", for use in APIs only
   KEY_BACKSPACE = 0x008,
@@ -296,5 +300,9 @@ enum tttp_scancode {
 const char* tttp_name_for_scancode(enum tttp_scancode code);
 // Returns the KEY_* name for the scancode
 const char* tttp_identifier_for_scancode(enum tttp_scancode code);
+
+#if __cplusplus
+}
+#endif
 
 #endif
