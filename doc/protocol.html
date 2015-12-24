@@ -114,7 +114,7 @@ H(H(N) xor H(g)) =
 <p>If this does not match the client's calculation of same, the client aborts the connection, and informs the user that the server is behaving in a deceptive way.</p>
 <h3>Distribution of keys</h3>
 <p>When a key is about to be added to a key database, its "key fingerprint" should be presented. The "key fingerprint" consists of the first half and second half of the SHA-256 of the public key, XORed together, presented as 2-digit pairs of lowercase hexadecimal digits, separated by colons.</p>
-<p>Clients should be able to import public keys in Base64 form, and servers should be able to import and export both public and private keys in Base64 and raw binary forms. Since public and private keys are both 384 bytes long, at least 512 bytes of Base64 are required. When exporting keys, there should be 64 characters per line. When importing, non-Base64 characters should be ignored, and a premature '=' should render a key invalid.</p>
+<p>Clients should be able to import public keys in Base64 form, and servers should be able to import and export both public and private keys in Base64 form. Since public and private keys are both 384 bytes long, at least 512 bytes of Base64 are required. When exporting keys, there should be 64 characters per line. When importing, non-Base64 characters should be ignored, and a premature '=' should render a key invalid.</p>
 <pre>Example fingerprint:
   f0:e4:c2:f7:6c:58:91:6e:c2:58:f2:46:85:1b:ea:09
 Example Base64 key: (unusable because it is &geq; N)
