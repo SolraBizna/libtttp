@@ -209,8 +209,8 @@ void tttp_password_to_verifier(void(*fatal_callback)(void*,const char*),
 
 int tttp_generate_public_key(void(*fatal_callback)(void*,const char*),
                              void* callback_data,
-                             const uint8_t private[TTTP_PRIVATE_KEY_LENGTH],
-                             uint8_t public[TTTP_PUBLIC_KEY_LENGTH]) {
+                             const uint8_t privatekey[TTTP_PRIVATE_KEY_LENGTH],
+                             uint8_t publickey[TTTP_PUBLIC_KEY_LENGTH]) {
   if(!tttp_init_called) {
     fprintf(stderr, "tttp_generate_public_key called before tttp_init\n");
     abort();
@@ -224,13 +224,13 @@ int tttp_generate_public_key(void(*fatal_callback)(void*,const char*),
   // N := (SRP parameter N defined in specification)
   mpz_import(N, SRP_N_BYTES, 1, 1, 1, 0, SRP_N);
   // z := z
-  mpz_import(z, SRP_N_BYTES, 1, 1, 1, 0, private);
+  mpz_import(z, SRP_N_BYTES, 1, 1, 1, 0, privatekey);
   int ret;
   if(mpz_sgn(z) == 0 || mpz_cmp(z, N) >= 0) ret = 0;
   else {
     // result := g^z
     mpz_powm_sec(result, g, z, N);
-    tttp_export_and_zero_fill_Nsize(public, result);
+    tttp_export_and_zero_fill_Nsize(publickey, result);
     ret = 1;
   }
   mpz_clears(g, z, N, result, NULL);
