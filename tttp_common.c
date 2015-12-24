@@ -202,7 +202,7 @@ void tttp_password_to_verifier(void(*fatal_callback)(void*,const char*),
   // x := x
   mpz_import(x, SHA256_HASHBYTES, 1, 1, 1, 0, x_bytes);
   // result := g^x
-  mpz_powm_sec(result, g, x, N);
+  mpz_powm(result, g, x, N);
   tttp_export_and_zero_fill_Nsize(verifier, result);
   mpz_clears(g, x, N, result, NULL);
 }
@@ -229,7 +229,7 @@ int tttp_generate_public_key(void(*fatal_callback)(void*,const char*),
   if(mpz_sgn(z) == 0 || mpz_cmp(z, N) >= 0) ret = 0;
   else {
     // result := g^z
-    mpz_powm_sec(result, g, z, N);
+    mpz_powm(result, g, z, N);
     tttp_export_and_zero_fill_Nsize(publickey, result);
     ret = 1;
   }
