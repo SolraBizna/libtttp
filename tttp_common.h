@@ -172,7 +172,7 @@ void tttp_get_key_fingerprint(const uint8_t key[TTTP_KEY_LENGTH],
                               char buf[TTTP_FINGERPRINT_BUFFER_SIZE]);
 
 /* The digits we use for Base64, exposed for your convenience */
-extern const char base64_digits[64];
+extern const char tttp_base64_digits[64];
 
 /* Base64-encodes a key. */
 void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],

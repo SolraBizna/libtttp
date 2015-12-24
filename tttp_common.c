@@ -259,7 +259,7 @@ void tttp_get_key_fingerprint(const uint8_t key[TTTP_PUBLIC_KEY_LENGTH],
   lsx_explicit_bzero(hash, sizeof(hash));
 }
 
-const char base64_digits[64] =
+const char tttp_base64_digits[64] =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],
                         char buf[TTTP_KEY_BASE64_BUFFER_SIZE]) {
@@ -269,10 +269,10 @@ void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],
   char* outp = buf;
   const uint8_t* inp = key;
   for(unsigned int n = 0; n < TTTP_KEY_BASE64_MIN_SIZE/4; ++n) {
-    *outp++ = base64_digits[inp[0]>>2];
-    *outp++ = base64_digits[((inp[0]<<4)&48)|(inp[1]>>4)];
-    *outp++ = base64_digits[((inp[1]<<2)&60)|(inp[2]>>6)];
-    *outp++ = base64_digits[inp[2]&63];
+    *outp++ = tttp_base64_digits[inp[0]>>2];
+    *outp++ = tttp_base64_digits[((inp[0]<<4)&48)|(inp[1]>>4)];
+    *outp++ = tttp_base64_digits[((inp[1]<<2)&60)|(inp[2]>>6)];
+    *outp++ = tttp_base64_digits[inp[2]&63];
     inp += 3;
     if(n % 16 == 15) *outp++ = '\n';
   }
