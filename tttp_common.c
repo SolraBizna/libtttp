@@ -259,7 +259,7 @@ void tttp_get_key_fingerprint(const uint8_t key[TTTP_PUBLIC_KEY_LENGTH],
   lsx_explicit_bzero(hash, sizeof(hash));
 }
 
-static const char* base64_digits =
+const char base64_digits[64] =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],
                         char buf[TTTP_KEY_BASE64_BUFFER_SIZE]) {
