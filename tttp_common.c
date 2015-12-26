@@ -136,8 +136,9 @@ void tttp_export_and_zero_fill_Nsize(uint8_t out[SRP_N_BYTES], mpz_t in) {
   }
   else memcpy(out, tmpout, SRP_N_BYTES);
 #else
-  size_t count = SRP_N_BYTES;
-  mpz_export(out, &count, 1, 1, 1, 0, in);
+  size_t count = SRP_N_BYTES / 8;
+  mpz_export(out, &count, 1, 8, 1, 0, in);
+  count *= 8;
   if(count < SRP_N_BYTES) {
     memmove(out + (SRP_N_BYTES-count), out, count);
     memset(out, 0, SRP_N_BYTES-count);
