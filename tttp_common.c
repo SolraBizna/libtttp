@@ -1,4 +1,4 @@
-#define CHECK_FOR_BIG_NUMBERS 1
+#define CHECK_FOR_BIG_NUMBERS 0
 
 #include "tttp_internal.h"
 
