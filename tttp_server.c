@@ -133,7 +133,7 @@ static void fatal(tttp_server* self, const char* what, ...) {
 }
 
 #if __GNUC__
-static void foul(tttp_client* self, const char* what, ...)
+static void foul(tttp_server* self, const char* what, ...)
   __attribute__((format(printf,2,3)));
 #endif
 static void foul(tttp_server* self, const char* what, ...) {
@@ -941,7 +941,7 @@ void tttp_server_send_frame(tttp_server* self,
   if(self->server_state == SS_DEAD) FATAL_DEAD_STATE(self);
   else if(self->server_state != SS_COMPLETE) FATAL_WRONG_STATE(self);
   if(width == 0 || height == 0)
-    fatal(self, "%s: zero-byte framebuffer provided");
+    fatal(self, "%s: zero-byte framebuffer provided", __FUNCTION__);
   uint32_t total_bytes = ((uint32_t)width)*height*2;
   uint32_t needed_buffers = 2;
   if(self->negotiated_flags & TTTP_FLAG_UNICODE) total_bytes *= 2;
