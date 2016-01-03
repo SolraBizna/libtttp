@@ -208,7 +208,7 @@ static void fatal(tttp_client* self, const char* what, ...) {
 
 #if __GNUC__
 static void foul(tttp_client* self, const char* what, ...)
-  __attribute__((noreturn,format(printf,2,3)));
+  __attribute__((format(printf,2,3)));
 #endif
 static void foul(tttp_client* self, const char* what, ...) {
   if(self->client_state == CS_DEAD)
