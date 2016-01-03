@@ -189,7 +189,7 @@ static void kill_state(tttp_client* self) {
 
 #if __GNUC__
 static void fatal(tttp_client* self, const char* what, ...)
-  __attribute__((noreturn));
+  __attribute__((noreturn,format(printf,2,3)));
 #endif
 static void fatal(tttp_client* self, const char* what, ...) {
   kill_state(self);
@@ -206,6 +206,10 @@ static void fatal(tttp_client* self, const char* what, ...) {
   abort();
 }
 
+#if __GNUC__
+static void foul(tttp_client* self, const char* what, ...)
+  __attribute__((noreturn,format(printf,2,3)));
+#endif
 static void foul(tttp_client* self, const char* what, ...) {
   if(self->client_state == CS_DEAD)
     fatal(self, "foul called on a dead client (libtttp bug)");
