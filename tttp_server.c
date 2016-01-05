@@ -1187,7 +1187,8 @@ int tttp_server_pump(tttp_server* self) {
           foul(self, "MRES message too short");
           return 0;
         }
-        if(!self->mres_callback) FATAL_MISSING_CALLBACK("mouse resolution");
+        if(!self->mres_callback) FATAL_MISSING_CALLBACK(self,
+                                                        "mouse resolution");
         self->mres_callback(self->cbdata, self->message_data_ptr[0],
                             self->message_data_ptr[1]);
         break;
