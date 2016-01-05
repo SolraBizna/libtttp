@@ -121,7 +121,8 @@ struct tttp_client {
   void(*unknown_callback)(void* data, uint32_t msgid, const uint8_t* msgdata,
                           uint32_t datalen);
   uint8_t* cp437_map, *from_cp437_map;
-  uint8_t queue_depth, have_valid_palette:1, paste_mode_enabled:1;
+  uint8_t queue_depth, mouse_width, mouse_height,
+    have_valid_palette:1, paste_mode_enabled:1;
   uint16_t preferred_width, preferred_height, maximum_width, maximum_height;
   uint32_t negotiated_flags;
   uint32_t message_type, message_len;
@@ -465,6 +466,8 @@ tttp_client* tttp_client_init(void* data,
   ret->cp437_map = CP437_MAP_DEFAULT;
   ret->from_cp437_map = NULL;
   ret->queue_depth = 0;
+  ret->mouse_width = 1;
+  ret->mouse_height = 1;
   ret->have_valid_palette = 0;
   ret->paste_mode_enabled = 0;
   ret->preferred_width = 0;
@@ -547,6 +550,26 @@ void tttp_client_set_screen_params(tttp_client* self,
     self->maximum_height = maximum_height;
     self->maximum_width = maximum_width;
     self->maximum_height = maximum_height;
+  }
+}
+
+void tttp_client_set_mouse_resolution(tttp_client* self,
+                                      uint8_t w, uint8_t h) {
+  if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
+  if(w == 0 || h == 0) fatal(self, "%s: both parameters must be non-zero",
+                             __FUNCTION__);
+  switch(self->client_state) {
+  case CS_PASTING: FATAL_WRONG_STATE(self);
+  case CS_COMPLETE:
+    if((self->negotiated_flags & TTTP_FLAG_PRECISE_MOUSE)
+       && (self->mouse_width != w || self->mouse_height != h)) {
+      uint8_t buf[7] = {'M' | 0x80, 'R', 'E', 'S', 2,
+                        w, h};
+      send_data(self, buf, sizeof(buf));
+    }
+  default:
+    self->mouse_width = w;
+    self->mouse_height = h;
   }
 }
 
@@ -1288,6 +1311,12 @@ int tttp_client_pump(tttp_client* self) {
                              self->maximum_height >> 8, self->maximum_height};
           send_data(self, buf, sizeof(buf));
         }
+        if((self->negotiated_flags & TTTP_FLAG_PRECISE_MOUSE)
+           && (self->mouse_width != 1 || self->mouse_height != 1)) {
+          uint8_t buf[7] = {'M' | 0x80, 'R', 'E', 'S', 2,
+                            self->mouse_width, self->mouse_height};
+          send_data(self, buf, sizeof(buf));
+        }
         if(self->kyrp_callback) {
           self->kyrp_callback(self->cbdata, ~(uint32_t)0, ~(uint32_t)0);
         }
@@ -1454,6 +1483,10 @@ void tttp_client_send_text(tttp_client* self, uint8_t* text, size_t textlen) {
 void tttp_client_send_mouse_movement(tttp_client* self, int16_t x, int16_t y) {
   if(self->client_state == CS_DEAD) FATAL_DEAD_STATE(self);
   else if(self->client_state != CS_COMPLETE) FATAL_WRONG_STATE(self);
+  if(!(self->negotiated_flags & TTTP_FLAG_PRECISE_MOUSE)) {
+    x /= self->mouse_width;
+    y /= self->mouse_height;
+  }
   uint8_t buf[9] = {'M'|0x80,'o','u','s',4,(uint16_t)x>>8,x,(uint16_t)y>>8,y};
   send_data(self, buf, sizeof(buf));
 }

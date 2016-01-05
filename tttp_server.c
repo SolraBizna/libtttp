@@ -36,6 +36,7 @@ struct tttp_server {
   void(*scrn_callback)(void* data,
                        uint16_t preferred_width, uint16_t preferred_height,
                        uint16_t maximum_width, uint16_t maximum_height);
+  void(*mres_callback)(void* data, uint8_t w, uint8_t h);
   void(*key_callback)(void* data, int pressed, uint16_t scancode);
   void(*mous_callback)(void* data, int16_t x, int16_t y);
   void(*mbtn_callback)(void* data, int pressed, uint16_t button);
@@ -271,6 +272,7 @@ static int get_message(tttp_server* self) {
     if((self->message_type & 0x20200000) == 0) {
       switch(self->message_type & 0x7F7FFFFF) {
       case 'FLAG': case 'AUTH': case 'NAUT': case 'ONES': case 'QUER':
+      case 'MRES':
         break;
       default:
         foul(self, "Unknown standard critical message received (%c%c%c%c)",
@@ -382,6 +384,7 @@ tttp_server* tttp_server_init(void* data,
   ret->ones_callback = NULL;
   ret->queu_callback = NULL;
   ret->scrn_callback = NULL;
+  ret->mres_callback = NULL;
   ret->key_callback = NULL;
   ret->mous_callback = NULL;
   ret->mbtn_callback = NULL;
@@ -841,6 +844,13 @@ void tttp_server_set_screen_params_callback
   self->scrn_callback = screen_params;
 }
 
+void tttp_server_set_mouse_res_callback(tttp_server* self,
+                                        void(*mres)(void* data,
+                                                    uint8_t w, uint8_t h)) {
+  if(self->server_state == SS_DEAD) FATAL_DEAD_STATE(self);
+  self->mres_callback = mres;
+}
+
 void tttp_server_set_key_callback(tttp_server* self,
                                   void(*key)(void* data,
                                              int pressed,
@@ -1162,11 +1172,24 @@ int tttp_server_pump(tttp_server* self) {
         break;
       case 'Queu':
         if(self->message_len < 8) {
-          foul(self, "Scrn message too short");
+          foul(self, "Queu message too short");
           return 0;
         }
         if(self->queu_callback)
           self->queu_callback(self->cbdata, self->message_data_ptr[0]);
+        break;
+      case 'MRES':
+        if(!(self->negotiated_flags & TTTP_FLAG_PRECISE_MOUSE)) {
+          foul(self, "MRES received outside precise mouse mode");
+          return 0;
+        }
+        if(self->message_len < 2) {
+          foul(self, "MRES message too short");
+          return 0;
+        }
+        if(!self->mres_callback) FATAL_MISSING_CALLBACK("mouse resolution");
+        self->mres_callback(self->cbdata, self->message_data_ptr[0],
+                            self->message_data_ptr[1]);
         break;
       case 'ONES':
         self->ones_callback(self->cbdata);

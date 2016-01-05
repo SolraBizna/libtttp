@@ -95,6 +95,11 @@ void tttp_client_set_screen_params(tttp_client* self,
                                    uint16_t preferred_height,
                                    uint16_t maximum_width,
                                    uint16_t maximum_height);
+/* Call as soon as possible to specify the resolution of mouse coordinates per
+   _character cell_. If `TTTP_FLAG_PRECISE_MOUSE` is not set, the library will
+   handle the necessary scaling of mouse coordinates. */
+void tttp_client_set_mouse_resolution(tttp_client* self,
+                                      uint8_t w, uint8_t h);
 /* Call if you wish to query a server for a public key rather than using one on
    file. Returns a `tttp_handshake_result` value; `TTTP_HANDSHAKE_ADVANCE`
    means `public_key` and `servername` were filled out and you may proceed,

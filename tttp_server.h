@@ -205,6 +205,13 @@ void tttp_server_set_screen_params_callback
                                          uint16_t preferred_height,
                                          uint16_t maximum_width,
                                          uint16_t maximum_height));
+/* Sets the callback called whenever an 'MRES' message is received. 'MRES'
+   messages are only valid on connections where `TTTP_FLAG_PRECISE_MOUSE` is
+   set. The message gives the resolution of mouse coordinates per character
+   cell. Neither `w` nor `h` will ever be 0. */
+void tttp_server_set_mouse_res_callback(tttp_server* self,
+                                        void(*mres)(void* data,
+                                                   uint8_t w, uint8_t h));
 /* Sets the callback called whenever a 'Kp__'/'Kr__' message is received. The
    client sends these messages in response to keyboard keys being pressed/
    released. See "tttp_scancodes.h" and the protocol documentation for more

@@ -241,8 +241,11 @@ Clients that support pasting will not send the <tt>'Kp__'</tt> message correspon
 <li><tt>'Text' { uint8_t text[]; }</tt><br>
 Text input from the user. Whether this is sent before or after the keypresses that caused it is client-dependent. This text should not contain any non-printing characters&mdash;if a user typed, for instance, a newline, send the corresponding scancode instead.<br>
 The text is not NUL-terminated. An empty <tt>'Text'</tt> message, or a <tt>'Text'</tt> message containing a NUL, is an error.</li>
+<li><tt>'MRES' { uint8_t w, h; }</tt> (requires feature flag 0x00000008)<br>
+Gives the ratio between mouse coordinates and character cells. It is an error to specify 0 for either <tt>w</tt> or <tt>h</tt>. If no <tt>'MRES'</tt> is received (or a 'RSET' is performed), it is as if <tt>{1,1}</tt> was received.<br>
+Examples: A client with two units of mouse resolution for each character cell sends <tt>{2,2}</tt>. A client with pixel resolution and a 9x16 font sends <tt>{9,16}</tt>.</li>
 <li><tt>'Mous' { int16_t x, y; }</tt><br>
-Sent by the client to indicate movement of the mouse. The position is in character cells, and may fall outside the "screen."<br>
+Sent by the client to indicate movement of the mouse. The position may fall outside the "screen." Unless an <tt>'MRES'</tt> message specifies otherwise, coordinates are in character cells.<br>
 The client is responsible for displaying a mouse cursor. The server does not need to incorporate the mouse position into its frames.<br>
 The server should fully support clients that do not have mouse support. Keyboard alternatives for all UI actions must be provided.</li>
 <li><tt>'Mp__' / 'Mr__' {}</tt><br>
@@ -379,6 +382,8 @@ Once 16 bytes have been encrypted and sent in this manner, the corresponding cip
 In the default state, TTTP encodes all text as CP437 (or an arbitrary 256-character subset of Unicode). With Unicode mode enabled, all text is transmitted as UTF-8 and the frame layout is quite different. (See <a href="#FrameLayout">Frame Layout</a>.)</li>
 <li><tt>0x00000004</tt>: Reserved for future improvement of the Unicode mode<br>
 This flag will affect interpretation of the <tt>'FRAM'</tt> (in Unicode mode) and <tt>'CDPT'</tt> (in any mode) messages, and may introduce additional critical messages. A future version of this spec will define the full effects of this flag, <em>or may remove/repurpose it</em> and incorporate all changes directly into Unicode mode.</li>
+<li><tt>0x00000008</tt>: Precise mouse mode<br>
+In the default state, mouse coordinates are always cell coordinates. In precise mouse mode, the <tt>'MRES'</tt> message is permitted, allowing other resolutions to be specified.</li>
 <li><tt>0x80000000</tt>: Reserved for future changes relating to "flexible crypto"<br>
 The presence of this flag will indicate that authentication or encryption is different, in an incompatible way. A future version of this spec will define the full effects of this flag.<br>
 Servers <em>and</em> clients SHOULD require this flag, if Twofish-256, SHA-256, SRP-Z, or any of the ways they are used here are found to be insecure (or illegal).<br>

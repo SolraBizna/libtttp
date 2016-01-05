@@ -41,6 +41,8 @@ extern "C" {
 #define TTTP_FLAG_ENCRYPTION 0x00000001
 /* Whether we are in Unicode mode. */
 #define TTTP_FLAG_UNICODE 0x00000002
+/* Whether we are in precise mouse mode. */
+#define TTTP_FLAG_PRECISE_MOUSE 0x00000008
 /* Flags currently not supported. Will be used in future, and will keep their
    current names. */
 #define TTTP_FLAG_FUTURE_UNICODE 0x00000004
@@ -49,7 +51,7 @@ extern "C" {
 /* A bitmask containing every "known" flag. Servers receiving requests for
    other flags will ignore them. Clients receiving a 'FLAG' message from the
    server containing other flags will error out. */
-#define TTTP_KNOWN_FLAGS ((uint32_t)0x00000003)
+#define TTTP_KNOWN_FLAGS ((uint32_t)0x0000000B)
 
 /* Mouse buttons identifiers */
 #define TTTP_LEFT_MOUSE_BUTTON 0
