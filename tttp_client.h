@@ -16,6 +16,11 @@ typedef enum tttp_press_status {
 
 typedef struct tttp_client tttp_client;
 
+/* The default palette, for convenience. Clients won't normally need this as
+   the library will explicitly call the `PLTT` callback with this palette if
+   necessary to display a frame. */
+extern const uint8_t tttp_default_palette[48];
+
 /* Create a new tttp_client instance, using the given callbacks for IO.
    The tttp_client is in the "initialized" state.
    

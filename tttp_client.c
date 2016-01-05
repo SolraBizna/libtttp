@@ -12,7 +12,7 @@
 
 #define SRP self->tail->srp
 
-static const uint8_t default_palette[48] = {
+const uint8_t tttp_default_palette[48] = {
   0x00, 0x00, 0x00,  0xaa, 0x00, 0x00,  0x00, 0xaa, 0x00,  0xaa, 0x55, 0x00,
   0x00, 0x00, 0xaa,  0xaa, 0x00, 0xaa,  0x00, 0xaa, 0xaa,  0xaa, 0xaa, 0xaa,
   0x55, 0x55, 0x55,  0xff, 0x55, 0x55,  0x55, 0xff, 0x55,  0xff, 0xff, 0x55,
@@ -1183,7 +1183,7 @@ int tttp_client_pump(tttp_client* self) {
         else {
           if(!self->have_valid_palette) {
             if(!self->pltt_callback) FATAL_MISSING_CALLBACK(self, "pltt");
-            self->pltt_callback(self->cbdata, default_palette);
+            self->pltt_callback(self->cbdata, tttp_default_palette);
             self->have_valid_palette = 1;
           }
           uint16_t width = ((uint16_t)self->message_data_ptr[0] << 8)
