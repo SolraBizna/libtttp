@@ -1039,6 +1039,12 @@ tttp_handshake_result tttp_client_pump_verify(tttp_client* self) {
                        self->maximum_height >> 8, self->maximum_height};
     send_data(self, buf, sizeof(buf));
   }
+  if((self->negotiated_flags & TTTP_FLAG_PRECISE_MOUSE)
+     && (self->mouse_width != 1 || self->mouse_height != 1)) {
+    uint8_t buf[7] = {'M' | 0x80, 'R', 'E', 'S', 2,
+                      self->mouse_width, self->mouse_height};
+    send_data(self, buf, sizeof(buf));
+  }
   return TTTP_HANDSHAKE_ADVANCE;
 }
 
