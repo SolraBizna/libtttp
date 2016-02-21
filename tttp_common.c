@@ -265,23 +265,40 @@ const char tttp_base64_digits[64] =
    'T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l',
    'm','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4',
    '5','6','7','8','9','+','/'};
-void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],
-                        char buf[TTTP_KEY_BASE64_BUFFER_SIZE]) {
-#if TTTP_KEY_LENGTH % 3 != 0
-#error Will need to be rewritten
-#endif
+void tttp_value_to_base64(const uint8_t value[TTTP_KEY_LENGTH],
+                          size_t value_len,
+                          char buf[TTTP_KEY_BASE64_BUFFER_SIZE]) {
   char* outp = buf;
-  const uint8_t* inp = key;
-  for(unsigned int n = 0; n < TTTP_KEY_BASE64_MIN_SIZE/4; ++n) {
+  const uint8_t* inp = value;
+  size_t extra_bytes = value_len % 3;
+  size_t straight_value_len = value_len - extra_bytes;
+  for(unsigned int n = 0; n < straight_value_len; n += 3) {
+    if(n%48 == 0 && n != 0) *outp++ = '\n';
     *outp++ = tttp_base64_digits[inp[0]>>2];
     *outp++ = tttp_base64_digits[((inp[0]<<4)&48)|(inp[1]>>4)];
     *outp++ = tttp_base64_digits[((inp[1]<<2)&60)|(inp[2]>>6)];
     *outp++ = tttp_base64_digits[inp[2]&63];
     inp += 3;
-    if(n % 16 == 15) *outp++ = '\n';
   }
-  outp[-1] = 0;
-  assert(outp == buf + TTTP_KEY_BASE64_BUFFER_SIZE);
+  switch(extra_bytes) {
+  case 0: break;
+  case 1:
+    if(straight_value_len%48 == 0 && straight_value_len != 0) *outp++ = '\n';
+    *outp++ = tttp_base64_digits[inp[0]>>2];
+    *outp++ = tttp_base64_digits[((inp[0]<<4)&48)];
+    *outp++ = '=';
+    *outp++ = '=';
+    break;
+  case 2:
+    if(straight_value_len%48 == 0 && straight_value_len != 0) *outp++ = '\n';
+    *outp++ = tttp_base64_digits[inp[0]>>2];
+    *outp++ = tttp_base64_digits[((inp[0]<<4)&48)|(inp[1]>>4)];
+    *outp++ = tttp_base64_digits[((inp[1]<<2)&60)];
+    *outp++ = '=';
+    break;
+  }
+  *outp++ = 0;
+  assert(outp == buf + TTTP_BASE64_BUFFER_SIZE(value_len));
 }
 
 static int base64_value(char c) {
@@ -294,32 +311,57 @@ static int base64_value(char c) {
   else return -1;
 }
 
-int tttp_key_from_base64(const char* str,
-                         uint8_t key[TTTP_KEY_LENGTH]) {
-#if TTTP_KEY_LENGTH % 3 != 0
-#error Will need to be rewritten
-#endif
+int tttp_value_from_base64(const char* str,
+                           uint8_t value[TTTP_KEY_LENGTH],
+                           size_t value_len) {
   int32_t base64_buf = 0;
   int base64_had = 0;
-  uint8_t* outp = key;
-  while(*str && outp != key + TTTP_KEY_LENGTH) {
+  uint8_t* outp = value;
+  size_t rem_len = value_len;
+  while(*str && rem_len > 0) {
     int v = base64_value(*str++);
     if(v >= 0) {
       base64_buf = (base64_buf << 6) | v;
       ++base64_had;
       if(base64_had == 4) {
-        *outp++ = (uint8_t)(base64_buf>>16);
-        *outp++ = (uint8_t)(base64_buf>>8);
-        *outp++ = (uint8_t)base64_buf;
-        base64_buf = base64_had = 0;
+        if(rem_len >= 3) {
+          *outp++ = (uint8_t)(base64_buf>>16);
+          *outp++ = (uint8_t)(base64_buf>>8);
+          *outp++ = (uint8_t)base64_buf;
+          rem_len -= 3;
+          base64_buf = base64_had = 0;
+        }
+        else return 0; // too long
       }
     }
     else if(v == -2) break;
   }
-  if(outp == key + TTTP_KEY_LENGTH)
-    return memcmp(key, SRP_N, SRP_N_BYTES) < 0;
-  else
-    return 0;
+  switch(base64_had) {
+  case 0: break;
+  case 1: return 0; // invalid
+  case 2:
+    if(rem_len == 1) {
+      *outp++ = (uint8_t)(base64_buf>>4);
+      break;
+    }
+    else return 0;
+    break;
+  case 3:
+    if(rem_len == 2) {
+      *outp++ = (uint8_t)(base64_buf>>10);
+      *outp++ = (uint8_t)(base64_buf>>2);
+      break;
+    }
+    else return 0;
+    break;
+  }
+  return outp == value + value_len;
+}
+
+int tttp_key_from_base64(const char* str,
+                         uint8_t key[TTTP_KEY_LENGTH]) {
+  return tttp_value_from_base64(str, key, TTTP_KEY_LENGTH)
+    && memcmp(key, SRP_N, SRP_N_BYTES) < 0;
 }
 
 int tttp_key_is_null_public_key(const uint8_t key[TTTP_PUBLIC_KEY_LENGTH]) {

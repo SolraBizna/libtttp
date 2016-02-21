@@ -27,10 +27,25 @@ extern "C" {
    fingerprint */
 #define TTTP_FINGERPRINT_BUFFER_SIZE 48 // 32 digits, 15 colons, and a NUL
 /* The size, in bytes, of a buffer large enough to store a "canonical" Base64-
+   encoded value of the given size, including trailing NUL */
+/* Components:
+   (n-1)/48 = Number of in-buffer linebreaks
+   (n%3?n+(3-n%3):n)*4/3 = Number of Base64 chars
+   1 = Trailing NUL
+ */
+#define TTTP_BASE64_BUFFER_SIZE(n) ((n)==0?1:(((n)-1)/48)+((n)%3?(n)+(3-(n)%3):(n))*4/3+1)
+/* The smallest possible size, in Base64, of a valid value of the given size */
+#define TTTP_BASE64_MIN_SIZE(n) ((n)==0?1:((n)%3?(n)+(3-(n)%3):(n))*4/3)
+/* The size, in bytes, of a buffer large enough to store a "canonical" Base64-
    encoded key */
-#define TTTP_KEY_BASE64_BUFFER_SIZE (512+8) // 512 chars, 7 linebreaks, & a NUL
+#define TTTP_KEY_BASE64_BUFFER_SIZE TTTP_BASE64_BUFFER_SIZE(TTTP_KEY_LENGTH)
 /* The smallest possible size for a valid, Base64-encoded key. */
-#define TTTP_KEY_BASE64_MIN_SIZE 512
+#define TTTP_KEY_BASE64_MIN_SIZE TTTP_BASE64_MIN_SIZE(TTTP_KEY_LENGTH)
+/* The size, in bytes, of a buffer large enough to store a "canonical" Base64-
+   encoded salt */
+#define TTTP_SALT_BASE64_BUFFER_SIZE TTTP_BASE64_BUFFER_SIZE(TTTP_SALT_LENGTH)
+/* The smallest possible size for a valid, Base64-encoded salt. */
+#define TTTP_SALT_BASE64_MIN_SIZE TTTP_BASE64_MIN_SIZE(TTTP_SALT_LENGTH)
 
 /* Whether to attempt to use encryption on this connection. For clients,
    encryption should be default when authentication is being used. (This
@@ -176,9 +191,22 @@ void tttp_get_key_fingerprint(const uint8_t key[TTTP_KEY_LENGTH],
 /* The digits we use for Base64, exposed for your convenience */
 extern const char tttp_base64_digits[64];
 
+/* Base64-encodes an arbitrary value. */
+void tttp_value_to_base64(const uint8_t* value, size_t value_len,
+                          char* buf);
+
+/* Attempts to extract a value from a Base64 stream. If there were not enough
+   valid Base64 bytes, returns 0. Otherwise, returns 1. `value` is clobbered no
+   matter what. */
+int tttp_value_from_base64(const char* str,
+                           uint8_t* value, size_t value_len);
+
 /* Base64-encodes a key. */
-void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],
-                        char buf[TTTP_KEY_BASE64_BUFFER_SIZE]);
+#define tttp_key_to_base64(key,buf) \
+  tttp_value_to_base64(key, TTTP_KEY_LENGTH, buf)
+/* Base64-encodes a salt. */
+#define tttp_salt_to_base64(salt,buf) \
+  tttp_value_to_base64(salt, TTTP_SALT_LENGTH, buf)
 
 /* Attempts to extract a key from a Base64 stream. If there were not enough
    valid Base64 bytes, or if the key was >= N, returns 0. Otherwise, returns
@@ -189,6 +217,12 @@ void tttp_key_to_base64(const uint8_t key[TTTP_KEY_LENGTH],
    (respectively)! */
 int tttp_key_from_base64(const char* str,
                          uint8_t key[TTTP_KEY_LENGTH]);
+
+/* Attempts to extract a salt from a Base64 stream. If there were not enough
+   valid Base64 bytes, returns 0. Otherwise, returns 1. `salt` is clobbered no
+   matter what. */
+#define tttp_salt_from_base64(buf, salt) \
+  tttp_value_from_base64(buf, salt, TTTP_SALT_LENGTH)
 
 /* Returns non-zero if the key is the 0000..0001 key (null public key), 0
    otherwise.*/
