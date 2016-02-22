@@ -1171,7 +1171,7 @@ int tttp_server_pump(tttp_server* self) {
         }
         break;
       case 'Queu':
-        if(self->message_len < 8) {
+        if(self->message_len < 1) {
           foul(self, "Queu message too short");
           return 0;
         }
