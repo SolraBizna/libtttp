@@ -20,7 +20,7 @@
 <li>Distinct frames.</li>
 <li>Detailed keyboard state replication.</li>
 </ul>
-<p>TTTP is intended for the full-screen TUI applications, especially NetHack-like or Dwarf Fortress-like video games. It is not intended for traditional command line applications.</p>
+<p>TTTP is intended for full-screen TUI applications, especially NetHack-like or Dwarf Fortress-like video games. It is not intended for traditional command line applications.</p>
 <h2>Authentication</h2>
 <p>Authentication is performed with a specific case of SRP-Z. The description of the process give below was derived from <a href="http://srp.stanford.edu/design.html">Tom Wu's website about SRP-6a</a>, and <a href="http://crypto.stackexchange.com/questions/25272/is-this-variant-of-srp-for-peer-to-peer-authentication-practical">this StackExchange post about SRP-Z</a>. I <em>believe</em> that the SRP patent has expired, and that TTTP is therefore unencumbered, but I may be in error.</p>
 <h3>Parameters</h3>
@@ -87,10 +87,10 @@ H(H(N) xor H(g)) =
 <p>A server may opt out of server authentication, in which case it must act as with <tt>z = 0</tt>. This is not recommended.</p>
 <p>The server also generates a "salt nonce", 256 bits of random data. This is used as part of the user authentication process. Its secrecy is not as crucial as the private key; knowledge of the "salt nonce" only allows an attacker to determine whether a given account exists.</p>
 <h4>User initialization (server-side)</h3>
-<p>Whenever a user (including the guest user) has a password assigned, the server generates 256 bits of pseudorandom salt <tt>s</tt>. This salt is always newly generated at password assignment time, even if the password hasn't actually changed.</p>
+<p>Whenever a user (including the guest user) has a password assigned, the server generates 256 bits of pseudorandom salt <tt>s</tt>. This salt is always newly generated at password assignment time, even if the password hasn't actually changed. A given salt should only ever be assigned once.</p>
 <p>The server stores <tt>s</tt>, along with <tt>v = g^H(s, p)</tt>, and destroys any other knowledge it has of the client's password.</p>
 <h4>Handshake: Query</h4>
-<p>The client queries the server for its <tt>h</tt> value. The server may refuse to provide one, in which case the client cannot continue to authenticate (unless it has a public key on file for this server). The client keeps this <tt>h</tt> value on file; if a later connection to "the same" server provides a different <tt>h</tt>, the user should be alerted and then be take special action to continue the connection.</p>
+<p>The client queries the server for its <tt>h</tt> value. The server may refuse to provide one, in which case the client cannot continue to authenticate (unless it has a public key on file for this server). The client keeps this <tt>h</tt> value on file; if a later connection to "the same" server provides a different <tt>h</tt>, the user should be alerted in a scary manner and then be required to take special action if they want to continue the connection.</p>
 <p>As an optimization, if the client has an <tt>h</tt> on file for this server, it MAY bypass the query step, assume its <tt>h</tt> value is correct, and only query (and check) the current value on authentication failure. Authentication <em>will</em> fail if the client's <tt>h</tt> does not match the server's <tt>z</tt>, and attackers cannot exploit this optimization to gain information about the user's password <em>or</em> the server's private key.</p>
 <p>If the server opts out of server authentication, which is not recommended, the server will provide <tt>h = 1</tt>. In this case, the client should display a scary message on <strong>every connection</strong> indicating that the server may be untrustworthy, and not "file" the <tt>h</tt>.</p>
 <h4>Handshake: Client to Server</h4>
