@@ -464,6 +464,7 @@ tttp_handshake_result tttp_server_pump_beginning(tttp_server* self,
         if(servername == NULL) {
           uint8_t buf[4] = {'Q','U','E','R'};
           send_data(self, buf, sizeof(buf));
+          maybe_flush(self);
         }
         else {
           if(servernamelen > 255)
