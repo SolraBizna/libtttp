@@ -971,6 +971,8 @@ void tttp_server_send_frame(tttp_server* self,
       foul(self, "Memory allocation failed");
       return;
     }
+    self->last_width = width;
+    self->last_height = height;
   }
   // delta-encode frame and store new data for next time
   const uint8_t* srcp = framedata;

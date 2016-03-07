@@ -1202,6 +1202,8 @@ int tttp_client_pump(tttp_client* self) {
               foul(self, "Memory allocation failed");
               return 0;
             }
+            self->last_width = width;
+            self->last_height = height;
           }
           self->zlib.avail_in = self->message_len-4;
           self->zlib.next_in = self->message_data_ptr+4;
