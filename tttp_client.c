@@ -233,8 +233,8 @@ static void foul(tttp_client* self, const char* what, ...) {
 #define FATAL_WRONG_STATE(self) fatal(self, "%s called on tttp_client in inappropriate state", __FUNCTION__)
 #define FATAL_MISSING_CALLBACK(self, what) fatal(self, "%s called with null %s callback", __FUNCTION__, what)
 
-static uint8_t slow_hash_check(uint8_t a[SHA256_HASHBYTES],
-                               uint8_t b[SHA256_HASHBYTES]) {
+static uint8_t slow_hash_check(const uint8_t a[SHA256_HASHBYTES],
+                               const uint8_t b[SHA256_HASHBYTES]) {
   uint8_t ret = 0;
   for(int n = 0; n < SHA256_HASHBYTES; ++n) { ret |= a[n]^b[n]; }
   return ret;
