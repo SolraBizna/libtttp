@@ -155,6 +155,22 @@ void tttp_password_to_verifier(void(*fatal_callback)(void*,const char*),
                                size_t passwordlen,
                                uint8_t salt[TTTP_SALT_LENGTH],
                                uint8_t verifier[TTTP_VERIFIER_LENGTH]);
+/* Confirm whether a password matches a verifier. This shouldn't be needed
+   very often. One example of a situation where it's needed is asking a user to
+   confirm their current password before changing it.
+   
+   Returns non-zero if the password failed to match, zero if it did match.
+   
+   You should provide a (non-returning, such as via an exception or longjmp)
+   `fatal_callback` if you do not want the program to terminate because of a
+   memory allocation failure. (If you don't mind that happening, feel free to
+   pass NULL here.) */
+int tttp_confirm_password(void(*fatal_callback)(void*,const char*),
+                          void* callback_data,
+                          const uint8_t* password,
+                          size_t passwordlen,
+                          const uint8_t salt[TTTP_SALT_LENGTH],
+                          const uint8_t verifier[TTTP_VERIFIER_LENGTH]);
 /* Converts a "private key" into a "public key", or rejects it.
    Steps to generate a private/public key pair for a server:
    # Get TTTP_PRIVATE_KEY_LENGTH random bytes of the best available quality
