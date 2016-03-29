@@ -80,6 +80,13 @@ const uint8_t INITIAL_S2C_NONCE[TWOFISH_BLOCKBYTES] = {
 
 volatile int tttp_init_called = 0;
 
+static uint8_t slow_verifier_check(const uint8_t a[TTTP_VERIFIER_LENGTH],
+                                   const uint8_t b[TTTP_VERIFIER_LENGTH]) {
+  uint8_t ret = 0;
+  for(int n = 0; n < TTTP_VERIFIER_LENGTH; ++n) { ret |= a[n]^b[n]; }
+  return ret;
+}
+
 static void* secure_alloc(size_t amt) {
   void* ret = malloc(amt);
   if(ret == NULL)
@@ -172,18 +179,10 @@ void tttp_call_active_fatal(const char* what) {
   else default_fatal(NULL, what);
 }
 
-void tttp_password_to_verifier(void(*fatal_callback)(void*,const char*),
-                               void* callback_data,
-                               const uint8_t* password,
-                               size_t passwordlen,
-                               uint8_t salt[SHA256_HASHBYTES],
-                               uint8_t verifier[SRP_N_BYTES]) {
-  if(!tttp_init_called) {
-    fprintf(stderr, "tttp_password_to_verifier called before tttp_init\n");
-    abort();
-  }
-  tttp_set_active_fatal(fatal_callback, callback_data);
-  lsx_get_random(salt, SHA256_HASHBYTES);
+static void create_verifier(const uint8_t* password,
+                            size_t passwordlen,
+                            const uint8_t salt[SHA256_HASHBYTES],
+                            uint8_t verifier[SRP_N_BYTES]) {
   uint8_t x_bytes[SHA256_HASHBYTES];
   {
     lsx_sha256_context sha256;
@@ -206,6 +205,39 @@ void tttp_password_to_verifier(void(*fatal_callback)(void*,const char*),
   mpz_powm(result, g, x, N);
   tttp_export_and_zero_fill_Nsize(verifier, result);
   mpz_clears(g, x, N, result, NULL);
+}
+
+void tttp_password_to_verifier(void(*fatal_callback)(void*,const char*),
+                               void* callback_data,
+                               const uint8_t* password,
+                               size_t passwordlen,
+                               uint8_t salt[SHA256_HASHBYTES],
+                               uint8_t verifier[SRP_N_BYTES]) {
+  if(!tttp_init_called) {
+    fprintf(stderr, "tttp_password_to_verifier called before tttp_init\n");
+    abort();
+  }
+  tttp_set_active_fatal(fatal_callback, callback_data);
+  lsx_get_random(salt, SHA256_HASHBYTES);
+  create_verifier(password, passwordlen, salt, verifier);
+}
+
+int tttp_confirm_password(void(*fatal_callback)(void*,const char*),
+                          void* callback_data,
+                          const uint8_t* password,
+                          size_t passwordlen,
+                          const uint8_t salt[TTTP_SALT_LENGTH],
+                          const uint8_t verifier[TTTP_VERIFIER_LENGTH]) {
+  if(!tttp_init_called) {
+    fprintf(stderr, "tttp_password_to_verifier called before tttp_init\n");
+    abort();
+  }
+  tttp_set_active_fatal(fatal_callback, callback_data);
+  uint8_t generated_verifier[TTTP_VERIFIER_LENGTH];
+  create_verifier(password, passwordlen, salt, generated_verifier);
+  int ret = slow_verifier_check(verifier, generated_verifier);
+  lsx_explicit_bzero(generated_verifier, TTTP_VERIFIER_LENGTH);
+  return !ret;
 }
 
 int tttp_generate_public_key(void(*fatal_callback)(void*,const char*),
