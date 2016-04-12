@@ -818,6 +818,7 @@ void tttp_server_accept_auth(tttp_server* self) {
                SRP.B, SRP.u, SRP.S, SRP.temp, SRP.z, SRP.h, NULL);
     lsx_explicit_bzero(&SRP, sizeof(SRP));
     free(self->tail);
+    self->tail = NULL;
   }
   self->server_state = SS_COMPLETE;
 }

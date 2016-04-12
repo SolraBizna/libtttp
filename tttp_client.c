@@ -991,6 +991,7 @@ tttp_handshake_result tttp_client_pump_verify(tttp_client* self) {
                        SRP.k, SRP.h, SRP.temp, NULL);
             lsx_explicit_bzero(&SRP, sizeof(SRP));
             free(self->tail);
+            self->tail = NULL;
           }
         }
         else {
