@@ -411,7 +411,7 @@ Clients SHOULD, if a server indicates that this flag is required, give up on the
   <li>If a server's password database is compromised, but its private key remains secure, the server can be <em>partly</em> impersonated by an attacker.</li>
   <ul>
     <li>Users and guests that have previously recorded the right public key will see a scary warning message.</li>
-    <li>The attacker will be able to launch a dictionary attack against the stored passwords.</li>
+    <li>The attacker will be able to launch a brute force attack against the stored passwords.</li>
   </ul>
   <li>If a server's password database <em>and</em> private key are compromised, the server can be <em>fully</em> impersonated by the attacker.</li>
   <ul>
@@ -420,7 +420,7 @@ Clients SHOULD, if a server indicates that this flag is required, give up on the
       <li>...the attacker will <em>not</em> be able to use the TTTP handshake <em>itself</em> to gain knowledge of the user's password.</li>
       <li>...the attacker <em>may</em> be able to socially engineer the user into revealing their password <em>after</em> the handshake.</li>
     </ul>
-    <li>The attacker will be able to launch a dictionary attack against the stored passwords.</li>
+    <li>The attacker will be able to launch a brute force attack against the stored passwords.</li>
   </ul>
 </ul>
 <p>Upshot: <strong>KEEP THE PRIVATE KEY SAFE!</strong> The damage that is done by a leaked private key is <strong>FAR</strong> greater than the (already considerable) damage done by a leaked password database!</p>
