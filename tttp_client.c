@@ -244,7 +244,7 @@ static void advance_keystream(tttp_client* self, uint8_t buf[16]) {
   lsx_encrypt_twofish(&self->tail->crypto.twofish, buf, buf);
 }
 
-static void decrypt(tttp_client* self, uint8_t* p, size_t rem) {
+static void tttp_decrypt(tttp_client* self, uint8_t* p, size_t rem) {
   uint8_t pos = self->tail->crypto.s2c_pos;
   while(rem > 0) {
     if(pos == 16) {
@@ -262,8 +262,8 @@ static void decrypt(tttp_client* self, uint8_t* p, size_t rem) {
   self->tail->crypto.s2c_pos = pos;
 }
 
-static void encrypt(tttp_client* self, uint8_t* p, size_t rem) {
-    uint8_t pos = self->tail->crypto.c2s_pos;
+static void tttp_encrypt(tttp_client* self, uint8_t* p, size_t rem) {
+  uint8_t pos = self->tail->crypto.c2s_pos;
   while(rem > 0) {
     if(pos == 16) {
       advance_keystream(self, self->tail->crypto.c2s_buf);
@@ -284,7 +284,7 @@ static int send_data(tttp_client* self, uint8_t* send_buf, size_t len) {
   if(self->client_state < CS_COMPLETE
      || !(self->negotiated_flags & TTTP_FLAG_ENCRYPTION))
     return self->send_callback(self->cbdata, send_buf, len);
-  encrypt(self, send_buf, len);
+  tttp_encrypt(self, send_buf, len);
   return self->send_callback(self->cbdata, send_buf, len);
 }
 
@@ -294,7 +294,7 @@ static int receive_data(tttp_client* self, uint8_t* recv_buf, size_t len) {
     return self->receive_callback(self->cbdata, recv_buf, len);
   int red = self->receive_callback(self->cbdata, recv_buf, len);
   if(red <= 0) return red;
-  decrypt(self, recv_buf, red);
+  tttp_decrypt(self, recv_buf, red);
   return red;
 }
 
@@ -983,8 +983,8 @@ tttp_handshake_result tttp_client_pump_verify(tttp_client* self) {
             for(int n = 0; n < self->tail->crypto.s2c_pos; ++n)
               self->tail->crypto.s2c_buf[n] ^= 0xCC;
             if(self->recv_size > self->recv_buf_pos)
-              decrypt(self, self->recv_buf + self->recv_buf_pos,
-                      self->recv_size - self->recv_buf_pos);
+              tttp_decrypt(self, self->recv_buf + self->recv_buf_pos,
+                           self->recv_size - self->recv_buf_pos);
           }
           else {
             mpz_clears(SRP.N, SRP.g, SRP.a, SRP.A, SRP.B, SRP.u, SRP.x, SRP.S,
