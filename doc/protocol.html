@@ -372,7 +372,7 @@ Sent by the server when it is no longer in a position to receive pasted text. Du
 <ul>
 <li><tt>0x00000001</tt>: Encryption<br>
 With this feature enabled, the connection is encrypted in both directions.<br>
-When encryption is enabled, all traffic after the handshake is encrypted using Twofish-256 in OFB mode.<br>
+When encryption is enabled, all traffic after the handshake is encrypted using Twofish-256 in CFB mode.<br>
 Before any "real" data is encrypted, all bytes of the negotiated session key are bitwise XORed together and a quantity in the range [0,15] derived from the result. For client-to-server communication, this is the low-order four bits; for server-to-client communication, the high-order four bits. This quantity of 0xCC bytes are encrypted as if to transmit, but not actually transmitted. This increases resistance to bit-twiddling attacks. (See <a href="#Attacks">Attacks</a>)<br>
 A 16-byte nonce is initialized with <tt>0x243f6a8885a308d313198a2e03707344</tt>* for client-to-server communication, and its bitwise complement for server-to-client communication.<br>
 This nonce is encrypted with the negotiated session key by 256-bit Twofish to create a block of "keystream" data. Each of the next 16 bytes sent is bitwise XORed against the corresponding byte of the keystream.<br>
@@ -425,12 +425,11 @@ Clients SHOULD, if a server indicates that this flag is required, give up on the
 </ul>
 <p>Upshot: <strong>KEEP THE PRIVATE KEY SAFE!</strong> The damage that is done by a leaked private key is <strong>FAR</strong> greater than the (already considerable) damage done by a leaked password database!</p>
 <h3>Bit Twiddling</h3>
-<p>The basic theory is that an attacker knows the user is going to press one key, and wishes the user to press another key instead. A side effect of using OFB mode is that the attacker can flip the corresponding bits in the ciphertext (without decrypting it) and alter the plaintext. This is not considered a workable attack for the following reasons:</p>
+<p>The basic theory is that an attacker knows the user is going to press one key, and wishes the user to press another key instead. A side effect of using CFB mode is that the attacker can flip the corresponding bits in the ciphertext (without decrypting it) and alter the plaintext. This is not considered a workable attack for the following reasons:</p>
 <ul>
 <li>An attacker would need to know which encrypted bytes belonged to the targeted input messages, in a sea of other messages including a constant stream of <tt>'ONES'</tt> messages. This requires knowing the precise nature and timing of the targeted keypress, including delays in processing the keypress introduced by the hardware, the OS, the input handling layer of the client...</li>
-<li>The use of OFB means that a corrupted (or tampered) bit will corrupt all blocks after the block in which it occurred. This means that any tampering will quickly destabilize the connection, making it impossible to perform such tampering undetected. This also means that even an <em>extremely</em> fortunate attacker could compromise, at most, four consecutive keypresses or sixteen bytes of <tt>'Text'</tt>, before the <em>violent termination of the session</em>.</li>
-<li>The random displacement at the beginning of the encrypted stream prevents an attacker from knowing where block boundaries occur. This means that even an extremely fortunate attacker does not know for sure how many bytes they can compromise before the <em>violent termination of the session</em>.</li>
+<li>The use of CFB means that a corrupted (or tampered) bit will corrupt the next block after the block in which it occurred. This protocol does not contain an integrity check, but is (deliberately) very fragile in the presence of corruption. If the next block contains a message header (very likely in the client-to-server case) or a compressed frame (likely in the server-to-client case), sync will be lost and the connection will destabilize. This failure will take place on a very short timeframe; even an <em>extremely</em> fortunate attacker could compromise, at most, four consecutive keypresses or sixteen bytes of <tt>'Text'</tt>, before the <em>violent termination of the session</em>.</li>
+<li>The random displacement at the beginning of the encrypted stream prevents an attacker from knowing where block boundaries occur. This means that even an extremely fortunate attacker does not know for sure how many bytes they can compromise before the aforementioned <em>violent termination of the session</em>.</li>
 </ul>
-<p>A more obvious mode such as ECB or CBC mode was not used because of the requirement to pad to block boundaries, which would increase the bandwidth used by the protocol and otherwise complicate communications, while only protecting against a single attack that requires a large amount of supplementary knowledge (bordering on physical access) to mount.</p>
 </body>
 </html>
